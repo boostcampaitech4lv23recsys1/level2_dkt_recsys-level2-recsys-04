@@ -1,0 +1,9 @@
+# 생성되는 파일
+wandb
+__pycache__
+models
+asset
+weight
+lightgcn/run.log
+output
+
