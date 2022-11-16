@@ -5,12 +5,25 @@ import torch
 
 
 def prepare_dataset(device, basepath, verbose=True, logger=None):
+    """_summary_
+    Returns:
+        _type_: train dic, test dic, id+item 개수 길이
+        dic : 
+            edge : [[유저임베딩] * id+item 개수길이, [아이템임베딩] * id+item 개수길이], (2, 2475962)
+            label : [라벨] * id+item 개수길이, (2475962)
+    """    
+    # 데이터 불러오고 train, test 합치기
     data = load_data(basepath)
+    # answerCode가 -1인 값만 test로 둠.
     train_data, test_data = separate_data(data)
+    # 유저+아이템 모두 인덱싱한 결과값 배출.
     id2index = indexing_data(data)
+    # edge : [[유저1, 유저2, 유저3 ....], [아이템1, 아이템2 .....]], label(정답유무) : [라벨1, 라벨2, ....]
+    # 딕셔너리 형태로 배출
     train_data_proc = process_data(train_data, id2index, device)
     test_data_proc = process_data(test_data, id2index, device)
 
+    # 정보 출력하는 부분.
     if verbose:
         print_data_stat(train_data, "Train", logger=logger)
         print_data_stat(test_data, "Test", logger=logger)

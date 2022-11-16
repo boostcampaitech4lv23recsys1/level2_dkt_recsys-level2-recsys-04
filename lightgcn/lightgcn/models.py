@@ -7,6 +7,15 @@ from torch_geometric.nn.models import LightGCN
 
 
 def build(n_node, weight=None, logger=None, **kwargs):
+    """
+    Args:
+        n_node (int): id+item 개수.
+        weight (_type_, optional): ??
+        logger (_type_, optional): ??
+        **kwargs : embedding_dim, num_layers, alpha, 기타 추가 가능(LightGCN 파라미터)
+    Returns:
+        model : 바로 사용 가능한 모델 출력
+    """    
     model = LightGCN(n_node, **kwargs)
     if weight:
         if not os.path.isfile(weight):
@@ -15,6 +24,7 @@ def build(n_node, weight=None, logger=None, **kwargs):
         state = torch.load(weight)["model"]
         model.load_state_dict(state)
         return model
+    # weight가 정확히 무슨 역할을 하는진 모르겠으나 else로 계속 실행됨.
     else:
         logger.info("No load model")
         return model
@@ -49,6 +59,8 @@ def train(
     for e in range(n_epoch):
         # forward
         pred = model(train_data["edge"])
+
+        # https://pytorch-geometric.readthedocs.io/en/latest/_modules/torch_geometric/nn/models/lightgcn.html
         loss = model.link_pred_loss(pred, train_data["label"])
 
         # backward
