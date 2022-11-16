@@ -7,3 +7,6 @@ weight
 lightgcn/run.log
 output
 
+# 승훈 가상환경 폴더
+.dkt_venv
+.gcn_venv
