@@ -32,7 +32,7 @@ def build(n_node, weight=None, logger=None, **kwargs):
 
 def train(
     model,
-    train_data,
+    train_data, 
     valid_data=None,
     n_epoch=100,
     learning_rate=0.01,
@@ -49,9 +49,13 @@ def train(
 
     if valid_data is None:
         eids = np.arange(len(train_data["label"]))
+        # train_data["label"] 중 1000개 뽑기.
         eids = np.random.permutation(eids)[:1000]
         edge, label = train_data["edge"], train_data["label"]
         label = label.to("cpu").detach().numpy()
+        # train 내에서 valid 따로 추출. 즉 train 데이터 일부가 valid.
+        # 개인적으로 valid가 train과 구분되지 않아 이상해질 것 같음.
+        # valid는 test와 같이 학습과정에서 사용되지 않아야하는데 그렇지 못함.
         valid_data = dict(edge=edge[:, eids], label=label[eids])
 
     logger.info(f"Training Started : n_epoch={n_epoch}")

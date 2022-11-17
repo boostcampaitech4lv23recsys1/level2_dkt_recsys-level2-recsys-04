@@ -16,11 +16,17 @@ def prepare_dataset(device, basepath, verbose=True, logger=None):
     data = load_data(basepath)
     # answerCode가 -1인 값만 test로 둠.
     train_data, test_data = separate_data(data)
+
+    # train을 train과 valid로 나눠줌(베이스라인에 없는 코드 추가.)
+    train_data, valid_data = separate_valid(train_data)
+
     # 유저+아이템 모두 인덱싱한 결과값 배출.
     id2index = indexing_data(data)
     # edge : [[유저1, 유저2, 유저3 ....], [아이템1, 아이템2 .....]], label(정답유무) : [라벨1, 라벨2, ....]
     # 딕셔너리 형태로 배출
     train_data_proc = process_data(train_data, id2index, device)
+    # 베이스라인에 없는 코드(valid) 추가
+    valid_data_proc = process_data(valid_data, id2index, device)
     test_data_proc = process_data(test_data, id2index, device)
 
     # 정보 출력하는 부분.
@@ -28,7 +34,7 @@ def prepare_dataset(device, basepath, verbose=True, logger=None):
         print_data_stat(train_data, "Train", logger=logger)
         print_data_stat(test_data, "Test", logger=logger)
 
-    return train_data_proc, test_data_proc, len(id2index)
+    return train_data_proc, valid_data_proc, test_data_proc, len(id2index)
 
 
 def load_data(basepath):
@@ -50,6 +56,17 @@ def separate_data(data):
     test_data = data[data.answerCode < 0]
 
     return train_data, test_data
+
+# train을 train과 valid로 나눔. 단점 : 시간이 1분정도 걸림.
+def separate_valid(train_data):
+    user_final_time = train_data.groupby('userID')['Timestamp'].max()
+    train_data['train_valid'] = train_data.apply(lambda x : -1 if x.Timestamp == user_final_time[x.userID] else x['answerCode'], axis = 1)
+    valid_data = train_data[train_data['train_valid'] == -1]
+    train_data = train_data[train_data['train_valid'] >= 0] 
+    train_data.drop(['train_valid'], axis = 1, inplace = True)
+    valid_data.drop(['train_valid'], axis = 1, inplace = True)
+
+    return train_data, valid_data
 
 
 def indexing_data(data):
