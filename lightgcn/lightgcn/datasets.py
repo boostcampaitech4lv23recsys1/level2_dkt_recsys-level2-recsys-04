@@ -2,7 +2,9 @@ import os
 
 import pandas as pd
 import torch
+import warnings
 
+warnings.filterwarnings(action='ignore')
 
 def prepare_dataset(device, basepath, verbose=True, logger=None):
     """_summary_
