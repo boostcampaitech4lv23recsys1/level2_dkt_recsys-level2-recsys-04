@@ -11,7 +11,7 @@ def main(args):
     preprocess = Preprocess(args)
     preprocess.load_test_data(args.test_file_name)
     test_data = preprocess.get_test_data()
-    model = trainer.get_model(args).to(args.device)
+    model = trainer.load_model(args).to(args.device)
     trainer.inference(args, test_data, model)
 
 
