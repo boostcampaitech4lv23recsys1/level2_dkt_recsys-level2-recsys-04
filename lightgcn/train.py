@@ -30,7 +30,6 @@ def main():
     model = build(
         n_node,
         embedding_dim=CFG.embedding_dim,
-        valid_data = valid_data, # 베이스라인 대비 추가
         num_layers=CFG.num_layers,
         alpha=CFG.alpha,
         logger=logger.getChild("build"),
@@ -47,6 +46,7 @@ def main():
     train(
         model,
         train_data,
+        valid_data = valid_data, # 베이스라인 대비 추가
         n_epoch=CFG.n_epoch,
         learning_rate=CFG.learning_rate,
         use_wandb=CFG.user_wandb,

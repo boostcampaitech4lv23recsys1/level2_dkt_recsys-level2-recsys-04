@@ -71,7 +71,6 @@ def train(
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
         with torch.no_grad():
             prob = model.predict_link(valid_data["edge"], prob=True)
             prob = prob.detach().cpu().numpy()
