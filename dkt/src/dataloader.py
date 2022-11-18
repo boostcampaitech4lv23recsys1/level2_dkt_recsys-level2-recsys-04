@@ -85,6 +85,7 @@ class Preprocess:
         csv_file_path = os.path.join(self.args.data_dir, file_name)
         df = pd.read_csv(csv_file_path)  # , nrows=100000)
         df = self.__feature_engineering(df)
+        # 라벨 인코딩 해주기. (범주형 값 인덱싱)
         df = self.__preprocessing(df, is_train)
 
         # 추후 feature를 embedding할 시에 embedding_layer의 input 크기를 결정할때 사용
@@ -101,6 +102,10 @@ class Preprocess:
 
         df = df.sort_values(by=["userID", "Timestamp"], axis=0)
         columns = ["userID", "assessmentItemID", "testId", "answerCode", "KnowledgeTag"]
+
+        # group : user - items(문제들) / 판다스-시리즈
+        # items : 4개 요소가 들어있음 / 튜플
+        # items-요소 : 각 요소 별로 문제 개수만큼 값이 들어가있음 / 넘파이-리스트
         group = (
             df[columns]
             .groupby("userID")
@@ -164,9 +169,10 @@ from torch.nn.utils.rnn import pad_sequence
 
 
 def collate(batch):
-    col_n = len(batch[0])
+    col_n = len(batch[0]) # column 요소의 수 (defalut : 5, mask까지)
     col_list = [[] for _ in range(col_n)]
-    max_seq_len = len(batch[0][-1])
+    # 입력된 길이의 수. (미리 정해놓은 만큼 DKTDataset에서 이미 조정함)
+    max_seq_len = len(batch[0][-1]) 
 
     # batch의 값들을 각 column끼리 그룹화
     for row in batch:
@@ -187,6 +193,7 @@ def get_loaders(args, train, valid):
     train_loader, valid_loader = None, None
 
     if train is not None:
+        # masking 칼럼 추가.
         trainset = DKTDataset(train, args)
         train_loader = torch.utils.data.DataLoader(
             trainset,

@@ -82,6 +82,8 @@ def train(train_loader, model, optimizer, scheduler, args):
     total_targets = []
     losses = []
     for step, batch in enumerate(train_loader):
+        # process_batch return 값 : tuple. (요소 별 튜플)
+        # input : list(columns(6) * batch_size * max_seq_len)
         input = list(map(lambda t: t.to(args.device), process_batch(batch)))
         preds = model(input)
         targets = input[3]  # correct
@@ -181,7 +183,14 @@ def get_model(args):
 
 # 배치 전처리
 def process_batch(batch):
-
+    """
+    Args:
+        batch : tuple(5, test/question/tag/correct/mask)
+        tuple(test 등) : (batch_size : 64, max_seq_len : 20)
+    Returns:
+        tuple(test, question, tag, correct, mask, interaction)
+        tuple(test 등) : (batch_size : 64, max_seq_len : 20), masking을 잘 해줌.
+    """    
     test, question, tag, correct, mask = batch
 
     # change to float
