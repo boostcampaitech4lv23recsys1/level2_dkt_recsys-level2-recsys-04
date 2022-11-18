@@ -13,4 +13,6 @@ def setSeeds(seed=42):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.benchmark = True
     torch.backends.cudnn.deterministic = True
