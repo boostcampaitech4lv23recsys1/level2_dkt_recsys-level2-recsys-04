@@ -5,17 +5,36 @@ import torch
 
 
 def prepare_dataset(device, basepath, verbose=True, logger=None):
+    """_summary_
+    Returns:
+        _type_: train dic, test dic, id+item 개수 길이
+        dic : 
+            edge : [[유저임베딩] * id+item 개수길이, [아이템임베딩] * id+item 개수길이], (2, 2475962)
+            label : [라벨] * id+item 개수길이, (2475962)
+    """    
+    # 데이터 불러오고 train, test 합치기
     data = load_data(basepath)
+    # answerCode가 -1인 값만 test로 둠.
     train_data, test_data = separate_data(data)
-    id2index = indexing_data(data)
-    train_data_proc = process_data(train_data, id2index, device)
-    test_data_proc = process_data(test_data, id2index, device)
 
+    # train을 train과 valid로 나눠줌(베이스라인에 없는 코드 추가.)
+    train_data, valid_data = separate_valid(train_data)
+
+    # 유저+아이템 모두 인덱싱한 결과값 배출.
+    id2index = indexing_data(data)
+    # edge : [[유저1, 유저2, 유저3 ....], [아이템1, 아이템2 .....]], label(정답유무) : [라벨1, 라벨2, ....]
+    # 딕셔너리 형태로 배출
+    train_data_proc = process_data(train_data, id2index, device, True)
+    # 베이스라인에 없는 코드(valid) 추가
+    valid_data_proc = process_data(valid_data, id2index, device, False)
+    test_data_proc = process_data(test_data, id2index, device, False)
+
+    # 정보 출력하는 부분.
     if verbose:
         print_data_stat(train_data, "Train", logger=logger)
         print_data_stat(test_data, "Test", logger=logger)
 
-    return train_data_proc, test_data_proc, len(id2index)
+    return train_data_proc, valid_data_proc, test_data_proc, len(id2index)
 
 
 def load_data(basepath):
@@ -38,6 +57,17 @@ def separate_data(data):
 
     return train_data, test_data
 
+# train을 train과 valid로 나눔. 단점 : 시간이 1분정도 걸림.
+def separate_valid(train_data):
+    # 유저 기준 가장 마지막에 본 문제 valid 취급.
+    user_final_time = train_data.groupby(['userID']).last()['assessmentItemID']
+    train_data['train_valid'] = train_data.apply(lambda x : -1 if x.assessmentItemID == user_final_time[x.userID] else x['answerCode'], axis = 1)
+    valid_data = train_data[train_data['train_valid'] == -1]
+    train_data = train_data[train_data['train_valid'] >= 0] 
+    train_data.drop(['train_valid'], axis = 1, inplace = True)
+    valid_data.drop(['train_valid'], axis = 1, inplace = True)
+    return train_data, valid_data
+
 
 def indexing_data(data):
     userid, itemid = (
@@ -53,7 +83,8 @@ def indexing_data(data):
     return id_2_index
 
 
-def process_data(data, id_2_index, device):
+# 베이스라인 대비 train 인자 추가. train 데이터 or (valid, test) 구분자.
+def process_data(data, id_2_index, device, train = True):
     edge, label = [], []
     for user, item, acode in zip(data.userID, data.assessmentItemID, data.answerCode):
         uid, iid = id_2_index[user], id_2_index[item]
@@ -63,7 +94,10 @@ def process_data(data, id_2_index, device):
     edge = torch.LongTensor(edge).T
     label = torch.LongTensor(label)
 
-    return dict(edge=edge.to(device), label=label.to(device))
+    if train:
+        return dict(edge=edge.to(device), label=label.to(device))
+    else:
+        return dict(edge=edge.to(device), label=label)
 
 
 def print_data_stat(data, name, logger):
