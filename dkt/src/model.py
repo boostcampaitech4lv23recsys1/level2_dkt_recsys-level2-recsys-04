@@ -62,6 +62,8 @@ class LSTM(nn.Module):
 
         X = self.comb_proj(embed)
 
+        # X : (batch * max_seq_len * hidden_dim)
+        # out : (batch * max_seq_len * hidden_dim)
         out, _ = self.lstm(X)
         out = out.contiguous().view(batch_size, -1, self.hidden_dim)
         out = self.fc(out).view(batch_size, -1)
