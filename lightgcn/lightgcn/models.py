@@ -7,6 +7,15 @@ from torch_geometric.nn.models import LightGCN
 
 
 def build(n_node, weight=None, logger=None, **kwargs):
+    """
+    Args:
+        n_node (int): id+item 개수.
+        weight (_type_, optional): ??
+        logger (_type_, optional): ??
+        **kwargs : embedding_dim, num_layers, alpha, 기타 추가 가능(LightGCN 파라미터)
+    Returns:
+        model : 바로 사용 가능한 모델 출력
+    """    
     model = LightGCN(n_node, **kwargs)
     if weight:
         if not os.path.isfile(weight):
@@ -15,6 +24,7 @@ def build(n_node, weight=None, logger=None, **kwargs):
         state = torch.load(weight)["model"]
         model.load_state_dict(state)
         return model
+    # weight가 정확히 무슨 역할을 하는진 모르겠으나 else로 계속 실행됨.
     else:
         logger.info("No load model")
         return model
@@ -22,7 +32,7 @@ def build(n_node, weight=None, logger=None, **kwargs):
 
 def train(
     model,
-    train_data,
+    train_data, 
     valid_data=None,
     n_epoch=100,
     learning_rate=0.01,
@@ -39,9 +49,13 @@ def train(
 
     if valid_data is None:
         eids = np.arange(len(train_data["label"]))
+        # train_data["label"] 중 1000개 뽑기.
         eids = np.random.permutation(eids)[:1000]
         edge, label = train_data["edge"], train_data["label"]
         label = label.to("cpu").detach().numpy()
+        # train 내에서 valid 따로 추출. 즉 train 데이터 일부가 valid.
+        # 개인적으로 valid가 train과 구분되지 않아 이상해질 것 같음.
+        # valid는 test와 같이 학습과정에서 사용되지 않아야하는데 그렇지 못함.
         valid_data = dict(edge=edge[:, eids], label=label[eids])
 
     logger.info(f"Training Started : n_epoch={n_epoch}")
@@ -49,13 +63,14 @@ def train(
     for e in range(n_epoch):
         # forward
         pred = model(train_data["edge"])
+
+        # https://pytorch-geometric.readthedocs.io/en/latest/_modules/torch_geometric/nn/models/lightgcn.html
         loss = model.link_pred_loss(pred, train_data["label"])
 
         # backward
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
         with torch.no_grad():
             prob = model.predict_link(valid_data["edge"], prob=True)
             prob = prob.detach().cpu().numpy()
