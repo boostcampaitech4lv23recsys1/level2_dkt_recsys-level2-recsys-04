@@ -73,8 +73,8 @@ class Preprocess:
             )
             return int(timestamp)
 
-        df["Timestamp"] = df["Timestamp"].apply(convert_time)
-
+        #df["Timestamp"] = df["Timestamp"].apply(convert_time)
+        df["Timestamp"] = pd.to_datetime(df["Timestamp"])    
         return df
 
     def __feature_engineering(self, df):
