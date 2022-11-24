@@ -24,7 +24,7 @@ torch.cuda.empty_cache()
 parser = argparse.ArgumentParser()
 #--no-cuda default = True 에서 False로 변경
 #--batch-size default = 128이였는데 8로 변경(해결책 생기면 추후 수정해도 됨)
-parser.add_argument('--no-cuda', action='store_false', default=True, help='Disables CUDA training.')
+parser.add_argument('--no-cuda', action='store_false', default=False, help='Disables CUDA training.')
 parser.add_argument('--seed', type=int, default=42, help='Random seed.')
 parser.add_argument('--data-dir', type=str, default='data', help='Data dir for loading input data.')
 parser.add_argument('--data-file', type=str, default='assistment_test15.csv', help='Name of input data file.')
