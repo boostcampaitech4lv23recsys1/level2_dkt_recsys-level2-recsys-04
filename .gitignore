@@ -8,3 +8,8 @@ lightgcn/run.log
 output
 catboost_info
 tem.ipynb
+logs
+gkt/data copy
+gkt/__pycache__
+gkt/command.sh
+data
