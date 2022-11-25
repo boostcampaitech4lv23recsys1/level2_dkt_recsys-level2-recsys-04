@@ -13,5 +13,7 @@ tem.ipynb
 logs
 
 # GKT 내부 파일
-/GKT/data
-/GKT/command.sh
+/gkt/data
+/gkt/command.sh
+/gkt/processing_origin.py
+/gkt/processing_ysh.py
