@@ -8,3 +8,10 @@ lightgcn/run.log
 output
 catboost_info
 tem.ipynb
+
+# GKT 모델 생성 log
+logs
+
+# GKT 내부 파일
+/GKT/data
+/GKT/command.sh
