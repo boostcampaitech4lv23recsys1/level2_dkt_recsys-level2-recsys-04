@@ -13,8 +13,6 @@ from torch.autograd import Variable
 from models import GKT, MultiHeadAttention, VAE, DKT
 from metrics import KTLoss, VAELoss
 from processing import load_dataset
-gc.collect()
-torch.cuda.empty_cache()
 # Graph-based Knowledge Tracing: Modeling Student Proficiency Using Graph Neural Network.
 # For more information, please refer to https://dl.acm.org/doi/10.1145/3350546.3352513
 # Author: jhljx
@@ -43,7 +41,7 @@ parser.add_argument('--edge-types', type=int, default=2, help='The number of edg
 parser.add_argument('--graph-type', type=str, default='Dense', help='The type of latent concept graph.')
 parser.add_argument('--dropout', type=float, default=0, help='Dropout rate (1 - keep probability).')
 parser.add_argument('--bias', type=bool, default=True, help='Whether to add bias for neural network layers.')
-parser.add_argument('--binary', type=bool, default=True, help='Whether only use 0/1 for results.')
+parser.add_argument('--binary', type=bool, default=False, help='Whether only use 0/1 for results.')
 parser.add_argument('--result-type', type=int, default=12, help='Number of results types when multiple results are used.')
 parser.add_argument('--temp', type=float, default=0.5, help='Temperature for Gumbel softmax.')
 parser.add_argument('--hard', action='store_true', default=False, help='Uses discrete samples in training forward pass.')
@@ -54,7 +52,7 @@ parser.add_argument('--epochs', type=int, default=50, help='Number of epochs to 
 parser.add_argument('--batch-size', type=int, default=8, help='Number of samples per batch.')
 parser.add_argument('--train-ratio', type=float, default=0.6, help='The ratio of training samples in a dataset.')
 parser.add_argument('--val-ratio', type=float, default=0.2, help='The ratio of validation samples in a dataset.')
-parser.add_argument('--shuffle', type=bool, default=True, help='Whether to shuffle the dataset or not.')
+parser.add_argument('--shuffle', type=bool, default=False, help='Whether to shuffle the dataset or not.')
 parser.add_argument('--lr', type=float, default=0.001, help='Initial learning rate.')
 parser.add_argument('--lr-decay', type=int, default=200, help='After how epochs to decay LR by a factor of gamma.')
 parser.add_argument('--gamma', type=float, default=0.5, help='LR decay factor.')

@@ -17,6 +17,7 @@ warnings.filterwarnings(action='ignore')
 
 
 class KTDataset(Dataset):
+    #데이터를 features / questions / answers 로 분할하여 저장(type : list)
     def __init__(self, features, questions, answers):
         super(KTDataset, self).__init__()
         self.features = features
@@ -31,6 +32,7 @@ class KTDataset(Dataset):
 
 
 def pad_collate(batch):
+    #batch(split) -> feature_pad, question_pad, answer_pad
     (features, questions, answers) = zip(*batch)
     features = [torch.LongTensor(feat) for feat in features]
     questions = [torch.LongTensor(qt) for qt in questions]
@@ -50,16 +52,12 @@ def load_dataset(file_path, batch_size, graph_type, dkt_graph_path=None, train_r
         shuffle: whether to shuffle the dataset or not
         use_cuda: whether to use GPU to accelerate training speed
     Return:
-        concept_num: the number of all concepts(or questions) skill_id의 고유값 개수
-        graph: the static graph is graph type is in ['Dense', 'Transition', 'DKT'], otherwise graph is None; conept_num을 이용하여 만든값
+        concept_num: KnowledgeTag의 고유값 개수
+        graph: the static graph is graph type is in ['Dense', 'Transition', 'DKT'], otherwise graph is None; conept_num을 이용하여 만듬
         train_data_loader: data loader of the training dataset
         valid_data_loader: data loader of the validation dataset
         test_data_loader: data loader of the test dataset
     NOTE: stole some code from https://github.com/lccasagrande/Deep-Knowledge-Tracing/blob/master/deepkt/data_util.py
-    FIXME : 밑에 코드 계속 수정작업중이라 원본 데이터 많이 날아가있고 실행도 안 됩니다. 적절히 걸러서 읽어주세요.
-    1. 데이터 불러오기
-    2. 데이터 전처리(결측치, 범주화 등등)
-    3. skill_with_answer, skill, correct 피쳐를 이용하여 데이터셋 만듬
     """
     df = pd.read_csv('data/FE_total.csv')
     # Step 1.1 - Remove questions without KnowledgeTag
@@ -68,28 +66,30 @@ def load_dataset(file_path, batch_size, graph_type, dkt_graph_path=None, train_r
     # Step 1.2 - Remove users with a single answer
     df = df.groupby('userID').filter(lambda q: len(q) > 1).copy()
 
-    # Step 2 - Enumerate skill id
-    df['skill'], _ = pd.factorize(df['KnowledgeTag'], sort=True)  # we can also use problem_id to represent exercises
+    # Step 2 - Enumerate KnowledgeTag
+    df['KnowledgeTag'], _ = pd.factorize(df['KnowledgeTag'], sort=True)  # we can also use problem_id to represent exercises
 
-    # Step 3 - Cross skill id with answer to form a synthetic feature
+    # Step 3 - Cross KnowledgeTag with answer to form a synthetic feature
     # use_binary: (0,1); !use_binary: (1,2,3,4,5,6,7,8,9,10,11,12). Either way, the correct result index is guaranteed to be 1
     if use_binary:
-        df['skill_with_answer'] = df['skill'] * 2 + df['answerCode']
+        df['KnowledgeTag_with_answer'] = df['KnowledgeTag'] * 2 + df['answerCode']
     else:
-        df['skill_with_answer'] = df['skill'] * res_len + df['answerCode'] - 1
+        df['KnowledgeTag_with_answer'] = df['KnowledgeTag'] * res_len + df['answerCode'] - 1
     def get_data(series):
-        feature_list.append(series['skill_with_answer'].tolist())
-        question_list.append(series['skill'].tolist())
+        feature_list.append(series['KnowledgeTag_with_answer'].tolist())
+        question_list.append(series['KnowledgeTag'].tolist())
         answer_list.append(series['answerCode'].eq(1).astype('int').tolist())
         seq_len_list.append(series['answerCode'].shape[0])
-    # Step 4 - Convert to a sequence per user id and shift features 1 timestep
+
     feature_list = []
     question_list = []
     answer_list = []
-    seq_len_list = []
+    seq_len_list = [] 
     df.groupby('userID').apply(get_data)
-    question_dim = int(df['skill'].max() + 1)
-    concept_num = question_dim
+    student_num = len(seq_len_list)
+    concept_num = int(df['KnowledgeTag'].max() + 1)
+
+    #train / valid / test (FE_catboost_copy.ipynb)
     _train = df[df['answerCode'] >= 0]
     _test = df[df['answerCode'] < 0]
     user_final_time = _train.groupby('userID')['Timestamp'].max()
@@ -97,19 +97,7 @@ def load_dataset(file_path, batch_size, graph_type, dkt_graph_path=None, train_r
     _valid = _train[_train['train_valid'] < 0]
     _train = _train[_train['train_valid'] >= 0]
 
-    df.groupby('userID').apply(get_data)
-    max_seq_len = np.max(seq_len_list)
-    print('max seq_len: ', max_seq_len)
-    student_num = len(seq_len_list)
-    print('student num: ', student_num)
-    feature_dim = int(df['skill_with_answer'].max() + 1)
-    print('feature_dim: ', feature_dim)
-    question_dim = int(df['skill'].max() + 1)
-    print('question_dim: ', question_dim)
-    concept_num = question_dim
-
-    # Step 5 - train / valid / test
-    
+    # Make train / valid / test dataset & dataloader
     feature_list = []
     question_list = []
     answer_list = []
@@ -135,6 +123,7 @@ def load_dataset(file_path, batch_size, graph_type, dkt_graph_path=None, train_r
     valid_data_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=pad_collate)
     test_data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=pad_collate)
 
+    # Make Graph
     graph = None
     if model_type == 'GKT':
         if graph_type == 'Dense':
