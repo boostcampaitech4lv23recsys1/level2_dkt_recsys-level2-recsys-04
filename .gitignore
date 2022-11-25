@@ -17,3 +17,5 @@ logs
 /gkt/command.sh
 /gkt/processing_origin.py
 /gkt/processing_ysh.py
+/gkt/data copy
+/gkt/__pycache__

@@ -13,7 +13,6 @@ from torch.autograd import Variable
 from models import GKT, MultiHeadAttention, VAE, DKT
 from metrics import KTLoss, VAELoss
 from processing import load_dataset
-
 # Graph-based Knowledge Tracing: Modeling Student Proficiency Using Graph Neural Network.
 # For more information, please refer to https://dl.acm.org/doi/10.1145/3350546.3352513
 # Author: jhljx
@@ -21,6 +20,8 @@ from processing import load_dataset
 
 
 parser = argparse.ArgumentParser()
+#--no-cuda default = True 에서 False로 변경
+#--batch-size default = 원래 128이였는데, 줄여가면서 돌려보고 되는 것중에 최대값으로?
 parser.add_argument('--no-cuda', action='store_false', default=False, help='Disables CUDA training.')
 parser.add_argument('--seed', type=int, default=42, help='Random seed.')
 parser.add_argument('--data-dir', type=str, default='data', help='Data dir for loading input data.')
@@ -77,6 +78,7 @@ if args.cuda:
 res_len = 2 if args.binary else args.result_type
 
 # Save model and meta-data. Always saves in a new sub-folder.
+# 파일이름 설정부분
 log = None
 save_dir = args.save_dir
 if args.save_dir:
@@ -339,7 +341,6 @@ def test():
             ec_list, rec_list, z_prob_list = None, None, None
             if args.model == 'GKT':
                 pred_res, ec_list, rec_list, z_prob_list = model(features, questions)
-                breakpoint()
             elif args.model == 'DKT':
                 pred_res = model(features, questions)
             else:

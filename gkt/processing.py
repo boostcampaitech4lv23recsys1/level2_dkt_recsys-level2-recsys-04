@@ -6,6 +6,9 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, TensorDataset, DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from utils import build_dense_graph
+import random
+import warnings
+warnings.filterwarnings(action='ignore')
 
 # Graph-based Knowledge Tracing: Modeling Student Proficiency Using Graph Neural Network.
 # For more information, please refer to https://dl.acm.org/doi/10.1145/3350546.3352513
@@ -14,6 +17,7 @@ from utils import build_dense_graph
 
 
 class KTDataset(Dataset):
+    #데이터를 features / questions / answers 로 분할하여 저장(type : list)
     def __init__(self, features, questions, answers):
         super(KTDataset, self).__init__()
         self.features = features
@@ -28,6 +32,7 @@ class KTDataset(Dataset):
 
 
 def pad_collate(batch):
+    #batch(split) -> feature_pad, question_pad, answer_pad
     (features, questions, answers) = zip(*batch)
     features = [torch.LongTensor(feat) for feat in features]
     questions = [torch.LongTensor(qt) for qt in questions]
@@ -47,8 +52,8 @@ def load_dataset(file_path, batch_size, graph_type, dkt_graph_path=None, train_r
         shuffle: whether to shuffle the dataset or not
         use_cuda: whether to use GPU to accelerate training speed
     Return:
-        concept_num: the number of all concepts(or questions)
-        graph: the static graph is graph type is in ['Dense', 'Transition', 'DKT'], otherwise graph is None
+        concept_num: KnowledgeTag의 고유값 개수
+        graph: the static graph is graph type is in ['Dense', 'Transition', 'DKT'], otherwise graph is None; conept_num을 이용하여 만듬
         train_data_loader: data loader of the training dataset
         valid_data_loader: data loader of the validation dataset
         test_data_loader: data loader of the test dataset
@@ -168,7 +173,9 @@ def load_dataset(file_path, batch_size, graph_type, dkt_graph_path=None, train_r
             graph = build_dkt_graph(dkt_graph_path, concept_num)
         if use_cuda and graph_type in ['Dense', 'Transition', 'DKT']:
             graph = graph.cuda()
+    
     return concept_num, graph, train_data_loader, valid_data_loader, test_data_loader
+
 
 
 def build_transition_graph(question_list, seq_len_list, indices, student_num, concept_num):
