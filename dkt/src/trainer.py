@@ -134,6 +134,8 @@ def validate(valid_loader, model, args):
         total_targets.append(targets.detach())
 
     total_preds = torch.concat(total_preds).cpu().numpy()
+    # 밑 1줄 베이스라인 대비 추가 / pred 값에 시그모이드 함수 적용. 
+    total_preds = 1 / (1 + np.exp(-total_preds))
     total_targets = torch.concat(total_targets).cpu().numpy()
 
     # Train AUC / ACC
@@ -159,6 +161,7 @@ def inference(args, test_data, model):
         # predictions
         preds = preds[:, -1]
         preds = preds.cpu().detach().numpy()
+        preds = 1 / (1 + np.exp(-preds))
         total_preds += list(preds)
 
     write_path = os.path.join(args.output_dir, "submission.csv")

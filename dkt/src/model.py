@@ -88,7 +88,7 @@ class LSTM2(nn.Module):
         self.embedding_tag = nn.Embedding(self.args.n_tag + 1, self.hidden_dim // 3)
 
         # embedding combination projection
-        self.comb_proj = nn.Linear((self.hidden_dim // 3) * 3, self.hidden_dim)
+        #self.comb_proj = nn.Linear((self.hidden_dim // 3) * 3, self.hidden_dim)
 
         self.lstm = nn.LSTM(
             self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True
@@ -96,7 +96,6 @@ class LSTM2(nn.Module):
 
         # Fully connected layer
         self.fc = nn.Linear(self.hidden_dim, 1)
-        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, input):
 
@@ -119,17 +118,16 @@ class LSTM2(nn.Module):
             2,
         )
 
-        test_X = self.comb_proj(embed)
+        #test_X = self.comb_proj(embed)
 
-        X = torch.mul(test_X, embed_correct)
-        #X = torch.sum(embed, 1)
+        X = torch.mul(embed, embed_correct)
+        out = torch.sum(X, 1)
         # X : (batch * max_seq_len * hidden_dim)
         # out : (batch * max_seq_len * hidden_dim)
-        out, _ = self.lstm(X)
+        #out, _ = self.lstm(X)
         #out = out.contiguous().view(batch_size, -1, self.hidden_dim)
         #out = self.relu1(out)
         out = self.fc(out).view(batch_size, -1) # (batch_size, hidden_dim)
-        out = self.softmax(out)
         return out
 
 
