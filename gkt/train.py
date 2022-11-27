@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import time
 import random
 import argparse
@@ -48,7 +49,7 @@ parser.add_argument('--hard', action='store_true', default=False, help='Uses dis
 parser.add_argument('--no-factor', action='store_true', default=False, help='Disables factor graph model.')
 parser.add_argument('--prior', action='store_true', default=False, help='Whether to use sparsity prior.')
 parser.add_argument('--var', type=float, default=1, help='Output variance.')
-parser.add_argument('--epochs', type=int, default=50, help='Number of epochs to train.')
+parser.add_argument('--epochs', type=int, default=1, help='Number of epochs to train.')
 parser.add_argument('--batch-size', type=int, default=16, help='Number of samples per batch.')
 parser.add_argument('--train-ratio', type=float, default=0.9, help='The ratio of training samples in a dataset.')
 parser.add_argument('--val-ratio', type=float, default=0.1, help='The ratio of validation samples in a dataset.')
@@ -110,9 +111,12 @@ dataset_path = os.path.join(args.data_dir, args.data_file)
 dkt_graph_path = os.path.join(args.dkt_graph_dir, args.dkt_graph)
 if not os.path.exists(dkt_graph_path):
     dkt_graph_path = None
-concept_num, graph, train_loader, valid_loader, test_loader = load_dataset(dataset_path, args.batch_size, args.graph_type, dkt_graph_path=dkt_graph_path,
-                                                                           train_ratio=args.train_ratio, val_ratio=args.val_ratio, shuffle=args.shuffle,
-                                                                           model_type=args.model, use_cuda=args.cuda)
+# test_last_q_idx -> 유저 별 마지막으로 푼 문제 idx 담은 list
+concept_num, graph, train_loader, valid_loader, test_loader, test_last_q_idx = load_dataset(
+    dataset_path, args.batch_size, args.graph_type, dkt_graph_path=dkt_graph_path,
+    train_ratio=args.train_ratio, val_ratio=args.val_ratio, shuffle=args.shuffle,
+    model_type=args.model, use_cuda=args.cuda
+)
 
 # build models
 graph_model = None
@@ -140,6 +144,7 @@ optimizer = optim.Adam(model.parameters(), lr=args.lr)
 scheduler = lr_scheduler.StepLR(optimizer, step_size=args.lr_decay, gamma=args.gamma)
 
 # load model/optimizer/scheduler params
+# 과거에 실험했던 model / optimizer / scheduler -> load_stat_dict로 불러와서 거기서부터 학습할 수 있음
 if args.load_dir:
     if args.model == 'DKT':
         model_file_name = 'DKT'
@@ -241,6 +246,11 @@ def train(epoch, best_val_loss):
                 pred_res = model(features, questions)
             else:
                 raise NotImplementedError(args.model + ' model is not implemented!')
+
+            # submission 값 얻기
+            
+            ####################
+
             loss_kt, auc, acc = kt_loss(pred_res, answers)
             loss_kt = float(loss_kt.cpu().detach().numpy())
             kt_val.append(loss_kt)
@@ -345,6 +355,18 @@ def test():
                 pred_res = model(features, questions)
             else:
                 raise NotImplementedError(args.model + ' model is not implemented!')
+            
+            # submission 파일 생성
+            submission = [u_pred_list[last_idx].item() for u_pred_list, last_idx in zip(pred_res, test_last_q_idx)]
+            if args.load_dir:
+                pd.DataFrame({"prediction": submission}).to_csv(
+                    os.path.join(args.load_dir, 'submission.csv'), index_label="id"
+                )
+            else:
+                pd.DataFrame({"prediction": submission}).to_csv(
+                    os.path.join(save_dir, 'submission.csv'), index_label="id"
+                )
+
             loss_kt, auc, acc = kt_loss(pred_res, answers)
             loss_kt = float(loss_kt.cpu().detach().numpy())
             if auc != -1 and acc != -1:
