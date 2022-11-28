@@ -151,6 +151,9 @@ def load_dataset(file_path, batch_size, graph_type, dkt_graph_path=None, train_r
     train_dataset = KTDataset(train_feature_list, train_question_list, train_answer_list)
     test_dataset = KTDataset(test_feature_list, test_question_list, test_answer_list)
 
+    # user 별 마지막으로 푼 문제 index 저장
+    test_last_q_idx = [len(q)-2 for q, _, _ in test_dataset]
+
     tot_size = len(train_seq_len_list)
     train_size = int(tot_size * train_ratio)
     val_size = tot_size - train_size
@@ -161,7 +164,8 @@ def load_dataset(file_path, batch_size, graph_type, dkt_graph_path=None, train_r
 
     train_data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=pad_collate)
     valid_data_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=pad_collate)
-    test_data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, collate_fn=pad_collate)  # 나중을 위해 shuffle=False로 하자
+    # 나중을 위해 shuffle=False로, batch_size=test_size로 한 번에
+    test_data_loader = DataLoader(test_dataset, batch_size=test_size, shuffle=False, collate_fn=pad_collate)
 
     graph = None
     if model_type == 'GKT':
@@ -174,7 +178,7 @@ def load_dataset(file_path, batch_size, graph_type, dkt_graph_path=None, train_r
         if use_cuda and graph_type in ['Dense', 'Transition', 'DKT']:
             graph = graph.cuda()
     
-    return concept_num, graph, train_data_loader, valid_data_loader, test_data_loader
+    return concept_num, graph, train_data_loader, valid_data_loader, test_data_loader, test_last_q_idx
 
 
 
