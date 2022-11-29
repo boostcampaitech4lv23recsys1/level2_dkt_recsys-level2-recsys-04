@@ -1,13 +1,14 @@
 import math
 import os
 
+import numpy as np
 import torch
 import wandb
 
 from .criterion import get_criterion
 from .dataloader import get_loaders
 from .metric import get_metric
-from .model import LSTM, LSTMATTN, Bert
+from .model import LSTM, LSTMATTN, Bert#, LSTM2
 from .optimizer import get_optimizer
 from .scheduler import get_scheduler
 
@@ -86,8 +87,7 @@ def train(train_loader, model, optimizer, scheduler, args):
         # input : list(columns(6) * batch_size * max_seq_len)
         input = list(map(lambda t: t.to(args.device), process_batch(batch)))
         preds = model(input)
-        targets = input[3]  # correct
-
+        targets = input[3] # correct, [:,-1].unsqueeze(1)
         loss = compute_loss(preds, targets)
         update_params(loss, model, optimizer, scheduler, args)
 
@@ -103,12 +103,15 @@ def train(train_loader, model, optimizer, scheduler, args):
         losses.append(loss)
 
     total_preds = torch.concat(total_preds).cpu().numpy()
+    # 밑 1줄 베이스라인 대비 추가 / pred 값에 시그모이드 함수 적용. 
+    total_preds = 1 / (1 + np.exp(-total_preds))
     total_targets = torch.concat(total_targets).cpu().numpy()
 
     # Train AUC / ACC
     auc, acc = get_metric(total_targets, total_preds)
     loss_avg = sum(losses) / len(losses)
     print(f"TRAIN AUC : {auc} ACC : {acc}")
+    #breakpoint()
     return auc, acc, loss_avg
 
 
@@ -131,6 +134,8 @@ def validate(valid_loader, model, args):
         total_targets.append(targets.detach())
 
     total_preds = torch.concat(total_preds).cpu().numpy()
+    # 밑 1줄 베이스라인 대비 추가 / pred 값에 시그모이드 함수 적용. 
+    total_preds = 1 / (1 + np.exp(-total_preds))
     total_targets = torch.concat(total_targets).cpu().numpy()
 
     # Train AUC / ACC
@@ -156,6 +161,7 @@ def inference(args, test_data, model):
         # predictions
         preds = preds[:, -1]
         preds = preds.cpu().detach().numpy()
+        preds = 1 / (1 + np.exp(-preds))
         total_preds += list(preds)
 
     write_path = os.path.join(args.output_dir, "submission.csv")
@@ -177,6 +183,8 @@ def get_model(args):
         model = LSTMATTN(args)
     if args.model == "bert":
         model = Bert(args)
+    # if args.model == "lstm2":
+    #     model = LSTM2(args)
 
     return model
 
@@ -208,6 +216,10 @@ def process_batch(batch):
     test = ((test + 1) * mask).int()
     question = ((question + 1) * mask).int()
     tag = ((tag + 1) * mask).int()
+    # 베이스라인 대비 추가. interaction 0 : 기록x, 1 : 못푼문제, 2 : 푼문제, 3 : 풀었는지 맞출문제.
+    # interaction = ((correct + 1) * mask).int()
+    # interaction[:, -1] = 3
+    
 
     return (test, question, tag, correct, mask, interaction)
 
