@@ -14,6 +14,7 @@ from torch.autograd import Variable
 from models import GKT, MultiHeadAttention, VAE, DKT
 from metrics import KTLoss, VAELoss
 from processing import load_dataset
+from GPUtil import showUtilization as gpu_usage
 # Graph-based Knowledge Tracing: Modeling Student Proficiency Using Graph Neural Network.
 # For more information, please refer to https://dl.acm.org/doi/10.1145/3350546.3352513
 # Author: jhljx
@@ -50,7 +51,7 @@ parser.add_argument('--no-factor', action='store_true', default=False, help='Dis
 parser.add_argument('--prior', action='store_true', default=False, help='Whether to use sparsity prior.')
 parser.add_argument('--var', type=float, default=1, help='Output variance.')
 parser.add_argument('--epochs', type=int, default=1, help='Number of epochs to train.')
-parser.add_argument('--batch-size', type=int, default=16, help='Number of samples per batch.')
+parser.add_argument('--batch-size', type=int, default=20, help='Number of samples per batch.')
 parser.add_argument('--train-ratio', type=float, default=0.9, help='The ratio of training samples in a dataset.')
 parser.add_argument('--val-ratio', type=float, default=0.1, help='The ratio of validation samples in a dataset.')
 parser.add_argument('--shuffle', type=bool, default=True, help='Whether to shuffle the dataset or not.')
@@ -58,7 +59,10 @@ parser.add_argument('--lr', type=float, default=0.001, help='Initial learning ra
 parser.add_argument('--lr-decay', type=int, default=200, help='After how epochs to decay LR by a factor of gamma.')
 parser.add_argument('--gamma', type=float, default=0.5, help='LR decay factor.')
 parser.add_argument('--test', type=bool, default=False, help='Whether to test for existed model.')
-parser.add_argument('--test-model-dir', type=str, default='logs/expDKT', help='Existed model file dir.')
+parser.add_argument('--test-model-dir', type=str, default='logs/expGKT', help='Existed model file dir.')
+## max sequence list 값 설정
+parser.add_argument('--max-seq-len-limit', type=int, default=600, help='max-seq-len ')
+parser.add_argument('--test-valid-len', type=int, default=3, help='max-seq-len ')
 
 
 
@@ -113,9 +117,9 @@ if not os.path.exists(dkt_graph_path):
     dkt_graph_path = None
 # test_last_q_idx -> 유저 별 마지막으로 푼 문제 idx 담은 list
 concept_num, graph, train_loader, valid_loader, test_loader, test_last_q_idx = load_dataset(
-    dataset_path, args.batch_size, args.graph_type, dkt_graph_path=dkt_graph_path,
+    dataset_path, args.max_seq_len_limit ,args.test_valid_len,args.batch_size, args.graph_type, dkt_graph_path=dkt_graph_path,
     train_ratio=args.train_ratio, val_ratio=args.val_ratio, shuffle=args.shuffle,
-    model_type=args.model, use_cuda=args.cuda
+    model_type=args.model, use_cuda=args.cuda 
 )
 
 # build models
@@ -203,6 +207,7 @@ def train(epoch, best_val_loss):
             raise NotImplementedError(args.model + ' model is not implemented!')
         loss_kt, auc, acc = kt_loss(pred_res, answers)
         kt_train.append(float(loss_kt.cpu().detach().numpy()))
+
         if auc != -1 and acc != -1:
             auc_train.append(auc)
             acc_train.append(acc)
@@ -213,17 +218,20 @@ def train(epoch, best_val_loss):
             else:
                 loss_vae = vae_loss(ec_list, rec_list, z_prob_list)
                 vae_train.append(float(loss_vae.cpu().detach().numpy()))
-            print('batch idx: ', batch_idx, 'loss kt: ', loss_kt.item(), 'loss vae: ', loss_vae.item(), 'auc: ', auc, 'acc: ', acc, end=' ')
+            print('batch idx: ', batch_idx,'/ ',len(train_loader), 'loss kt: ', loss_kt.item(), 'loss vae: ', loss_vae.item(), 'auc: ', auc, 'acc: ', acc, end=' ')
             loss = loss_kt + loss_vae
         else:
             loss = loss_kt
-            print('batch idx: ', batch_idx, 'loss kt: ', loss_kt.item(), 'auc: ', auc, 'acc: ', acc, end=' ')
+            print('batch idx: ', batch_idx,'/ ',len(train_loader),'loss kt: ', loss_kt.item(), 'auc: ', auc, 'acc: ', acc, end=' ')
         loss_train.append(float(loss.cpu().detach().numpy()))
         loss.backward()
         optimizer.step()
         scheduler.step()
         optimizer.zero_grad()
         del loss
+        print(gpu_usage())
+        gc.collect()
+        torch.cuda.empty_cache()
         print('cost time: ', str(time.time() - t1))
 
     loss_val = []
@@ -339,18 +347,22 @@ def test():
     vae_test = []
     auc_test = []
     acc_test = []
-
     if graph_model is not None:
         graph_model.eval()
     model.eval()
-    model.load_state_dict(torch.load(model_file))
+    if args.test == True:
+        model.load_state_dict(torch.load(os.path.join(args.test_model_dir, model_file_name + '.pt')))
+    else:
+        model.load_state_dict(torch.load(model_file))
     with torch.no_grad():
         for batch_idx, (features, questions, answers) in enumerate(test_loader):
+            
             if args.cuda:
                 features, questions, answers = features.cuda(), questions.cuda(), answers.cuda()
+            print(len(features),len(questions),len(answers))
             ec_list, rec_list, z_prob_list = None, None, None
             if args.model == 'GKT':
-                pred_res, ec_list, rec_list, z_prob_list = model(features, questions)
+                pred_res, ec_list, rec_list, z_prob_list = model(features, questions)  
             elif args.model == 'DKT':
                 pred_res = model(features, questions)
             else:
