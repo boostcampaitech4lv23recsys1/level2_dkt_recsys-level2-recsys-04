@@ -359,7 +359,6 @@ def test():
             
             if args.cuda:
                 features, questions, answers = features.cuda(), questions.cuda(), answers.cuda()
-            print(len(features),len(questions),len(answers))
             ec_list, rec_list, z_prob_list = None, None, None
             if args.model == 'GKT':
                 pred_res, ec_list, rec_list, z_prob_list = model(features, questions)  

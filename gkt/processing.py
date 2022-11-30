@@ -69,19 +69,22 @@ def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_t
     train = pd.read_csv(DATA_PATH + 'train_data.csv', dtype=dtype, parse_dates=['Timestamp'])
     test = pd.read_csv(DATA_PATH + 'test_data.csv', dtype=dtype, parse_dates=['Timestamp'])
     
-    
+
     ########## 여기에서 우리가 썼던 train test 셋으로 나누고 train validaiton 분리 시킨다.
     #test_valid_len (default ) = 3
-    dat = pd.concat([train, test.drop(test.tail(test_valid_len).index)], axis = 0)
+    
+    dat = pd.concat([train, test], axis = 0)
+    #dat = pd.concat([train, test.drop(test.tail(test_valid_len).index)], axis = 0)
     dat = dat.sort_values(by = ['userID', 'Timestamp'])
     
     ########### 여기에서 max sequence 값을 데이터 선에서 짤라주자
     dat = dat.groupby('userID', sort=False).tail(max_seq_len_limit)
-
-
+    
+    
     train = dat[dat['answerCode'] >= 0]
-    test = test.sort_values(by = ['userID', 'Timestamp'])
-    test = test.groupby('userID', sort=False).tail(test_valid_len)
+    #test = test.sort_values(by = ['userID', 'Timestamp'])
+    #test = test.groupby('userID', sort=False).tail(test_valid_len)
+    test = test.groupby('userID', sort=False).tail(max_seq_len_limit)
 
     #######train vaild split
     #user_final_time = train.groupby('userID')['Timestamp'].max()
@@ -152,20 +155,10 @@ def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_t
         test_answer_list.append(series['answerCode'].eq(1).astype('int').tolist())
         test_seq_len_list.append(series['answerCode'].shape[0])
 
-    valid_feature_list = []
-    valid_question_list = []
-    valid_answer_list = []
-    valid_seq_len_list = []
     
-    def valid_get_data(series):
-        valid_feature_list.append(series['KTag_wiht_answer'].tolist())
-        valid_question_list.append(series['KTag'].tolist())
-        valid_answer_list.append(series['answerCode'].eq(1).astype('int').tolist())
-        valid_seq_len_list.append(series['answerCode'].shape[0])
         
     train.groupby('userID').apply(train_get_data)
     test.groupby('userID').apply(test_get_data)
-    valid.groupby('userID').apply(valid_get_data)
 
     question_list = train_question_list + test_question_list
     seq_len_list = train_seq_len_list + test_seq_len_list
@@ -185,17 +178,16 @@ def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_t
 
     train_dataset = KTDataset(train_feature_list, train_question_list, train_answer_list)
     test_dataset = KTDataset(test_feature_list, test_question_list, test_answer_list)
-    val_dataset = KTDataset(valid_feature_list, valid_question_list, valid_answer_list)
 
     # user 별 마지막으로 푼 문제 index 저장
     test_last_q_idx = [len(q)-2 for q, _, _ in test_dataset]
 
-    tot_size = len(train_seq_len_list) + len(valid_seq_len_list)
-    train_size = len(train_seq_len_list)
-    val_size = len(valid_seq_len_list)
+    tot_size = len(train_seq_len_list)
+    train_size = int(tot_size * train_ratio)
+    val_size = tot_size - train_size
     test_size = len(test_seq_len_list)
 
-    #train_dataset, val_dataset = torch.utils.data.random_split(train_dataset, [train_size, val_size])
+    train_dataset, val_dataset = torch.utils.data.random_split(train_dataset, [train_size, val_size])
     print('train_size: ', train_size, 'val_size: ', val_size, 'test_size: ', test_size)
     
     train_data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=pad_collate)
