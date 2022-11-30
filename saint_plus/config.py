@@ -6,8 +6,8 @@ class Config:
     MAX_SEQ = 100  # USER 별 최대 문제 풀이 개수
     MIN_SEQ = 13   # USER 별 최소 문제 풀이 개수 (대회 Test 데이터 최소 문제 풀이 유저 -> 15개)
     EMBED_DIMS = 512
-    ENC_HEADS = DEC_HEADS = 8
-    NUM_ENCODER = NUM_DECODER = 4
+    ENC_HEADS = DEC_HEADS = 1
+    NUM_ENCODER = NUM_DECODER = 1
     BATCH_SIZE = 32
     TRAIN_FILE = "/opt/ml/input/data/train_data.csv"
     TEST_FILE = "/opt/ml/input/data/test_data.csv"

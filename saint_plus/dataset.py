@@ -15,10 +15,14 @@ class DKTDataset(Dataset):
         for id in self.samples.index:
             exe_ids, answers, ela_time, categories = self.samples[id]
             if len(exe_ids) > max_seq:
-                for l in range((len(exe_ids)+max_seq-1)//max_seq):
-                    self.data.append(
-                        (exe_ids[l:l+max_seq], answers[l:l+max_seq], ela_time[l:l+max_seq], categories[l:l+max_seq]))
-            elif len(exe_ids) < self.max_seq and len(exe_ids) > Config.MIN_SEQ:
+                self.data.append((exe_ids[-max_seq:], answers[-max_seq:], ela_time[-max_seq:], categories[-max_seq:]))
+                # if is_test:  # Test 데이터의 경우 증강하면 안되기 때문에, 마지막 max_seq 길이만큼의 데이터만 가져옴
+                #     self.data.append((exe_ids[-max_seq:], answers[-max_seq:], ela_time[-max_seq:], categories[-max_seq:]))
+                # else:
+                #     for l in range(len(exe_ids)-max_seq):  # max_seq이 100이면, 0~99 / 1~100 / 2~101 / ... 이런 식으로 잘라서 데이터 증강
+                #         self.data.append(
+                #             (exe_ids[l:l+max_seq], answers[l:l+max_seq], ela_time[l:l+max_seq], categories[l:l+max_seq]))
+            elif len(exe_ids) <= self.max_seq and len(exe_ids) > Config.MIN_SEQ:
                 self.data.append((exe_ids, answers, ela_time, categories))
             else:
                 continue
@@ -29,7 +33,6 @@ class DKTDataset(Dataset):
     def __getitem__(self, idx):
         question_ids, answers, ela_time, exe_category = self.data[idx]
         seq_len = len(question_ids)
-
         exe_ids = np.zeros(self.max_seq, dtype=int)
         ans = np.zeros(self.max_seq, dtype=int)
         elapsed_time = np.zeros(self.max_seq, dtype=int)
@@ -45,13 +48,13 @@ class DKTDataset(Dataset):
             elapsed_time[:] = ela_time[-self.max_seq:]
             exe_cat[:] = exe_category[-self.max_seq:]
 
+        # 한 칸 앞으로 당기는거 이미 앞에서 진행한 작업이라 skip 해놓음
         # input_rtime = np.zeros(self.max_seq, dtype=int)
-        # input_rtime = np.insert(elapsed_time, 0, 0)
+        # input_rtime = np.insert(elapsed_time, 0, 0)       
         # input_rtime = np.delete(input_rtime, -1)
 
-        input = {"input_ids": exe_ids, "input_rtime": elapsed_time.astype(
-            np.int32), "input_cat": exe_cat}
-        return input, ans
+        self.input = {"input_ids": exe_ids, "input_rtime": elapsed_time.astype(np.int32), "input_cat": exe_cat}
+        return self.input, ans
 
 
 def get_dataloaders():
@@ -65,6 +68,11 @@ def get_dataloaders():
     test_df = pd.read_csv(Config.TEST_FILE, usecols=[0, 1, 3, 4, 5], dtype=dtypes, parse_dates=['Timestamp'])
     train_df = train_df.sort_values(by=['userID', 'Timestamp']).reset_index(drop=True)
     test_df = test_df.sort_values(by=['userID', 'Timestamp']).reset_index(drop=True)
+    
+    train_df['assessmentItemID'], _ = pd.factorize(train_df['assessmentItemID'], sort=True)
+    train_df['KnowledgeTag'], _ = pd.factorize(train_df['KnowledgeTag'], sort=True)
+    test_df['assessmentItemID'], _ = pd.factorize(test_df['assessmentItemID'], sort=True)
+    test_df['KnowledgeTag'], _ = pd.factorize(test_df['KnowledgeTag'], sort=True)
 
     elapse = train_df.loc[:, ['userID', 'Timestamp']].groupby('userID').diff(periods=1)['Timestamp']
     elapse = elapse.fillna(pd.Timedelta(seconds=0)).apply(lambda x: x.total_seconds()).astype(np.int32)
@@ -101,10 +109,8 @@ def get_dataloaders():
     test = test_group.copy()
 
     # 메모리 청소하는 부분인듯? GKT 모델에도 써보면 좋을듯
-    del train_df, test_df, test_to_train_df, elapse
+    del train_df, test_df, test_to_train_df, elapse, train_group, test_group, test_to_train_group
     gc.collect()
-
-    breakpoint()
 
 
     # print("shape of train :", train_df.shape)
@@ -137,7 +143,7 @@ def get_dataloaders():
                             batch_size=Config.BATCH_SIZE,
                             num_workers=8,
                             shuffle=False)
-    
+
     del train_dataset, val_dataset, test_dataset
     gc.collect()
     return train_loader, val_loader, test_loader

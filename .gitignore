@@ -19,3 +19,6 @@ logs
 /gkt/processing_ysh.py
 /gkt/data copy
 /gkt/__pycache__
+
+# saint_plus 모델 내부 파일
+/saint_plus/lightning_logs
