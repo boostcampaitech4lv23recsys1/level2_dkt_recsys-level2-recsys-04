@@ -153,12 +153,12 @@ if args.load_dir:
     else:
         raise NotImplementedError(args.model + ' model is not implemented!')
     model_file = os.path.join(args.load_dir, model_file_name + '.pt')
-    optimizer_file = os.path.join(save_dir, model_file_name + '-Optimizer.pt')
-    scheduler_file = os.path.join(save_dir, model_file_name + '-Scheduler.pt')
+    optimizer_file = os.path.join(args.load_dir, model_file_name + '-Optimizer.pt')
+    scheduler_file = os.path.join(args.load_dir, model_file_name + '-Scheduler.pt')
     model.load_state_dict(torch.load(model_file))
     optimizer.load_state_dict(torch.load(optimizer_file))
     scheduler.load_state_dict(torch.load(scheduler_file))
-    args.save_dir = False
+    # args.save_dir = False
 
 # build optimizer
 optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -290,6 +290,9 @@ def train(epoch, best_val_loss):
               'time: {:.4f}s'.format(time.time() - t))
     if args.save_dir and np.mean(loss_val) < best_val_loss:
         print('Best model so far, saving...')
+        model_file = os.path.join(save_dir, model_file_name + '.pt')
+        optimizer_file = os.path.join(save_dir, model_file_name + '-Optimizer.pt')
+        scheduler_file = os.path.join(save_dir, model_file_name + '-Scheduler.pt')
         torch.save(model.state_dict(), model_file)
         torch.save(optimizer.state_dict(), optimizer_file)
         torch.save(scheduler.state_dict(), scheduler_file)
@@ -358,14 +361,13 @@ def test():
             
             # submission 파일 생성
             submission = [u_pred_list[last_idx].item() for u_pred_list, last_idx in zip(pred_res, test_last_q_idx)]
-            if args.load_dir:
-                pd.DataFrame({"prediction": submission}).to_csv(
-                    os.path.join(args.load_dir, 'submission.csv'), index_label="id"
-                )
-            else:
-                pd.DataFrame({"prediction": submission}).to_csv(
-                    os.path.join(save_dir, 'submission.csv'), index_label="id"
-                )
+            # if args.load_dir:
+            #     pd.DataFrame({"prediction": submission}).to_csv(
+            #         os.path.join(args.load_dir, 'submission.csv'), index_label="id"
+            #     )
+            pd.DataFrame({"prediction": submission}).to_csv(
+                os.path.join(save_dir, 'submission.csv'), index_label="id"
+            )
 
             loss_kt, auc, acc = kt_loss(pred_res, answers)
             loss_kt = float(loss_kt.cpu().detach().numpy())
