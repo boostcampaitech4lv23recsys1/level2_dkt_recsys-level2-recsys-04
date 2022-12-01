@@ -15,10 +15,21 @@ from models import GKT, MultiHeadAttention, VAE, DKT
 from metrics import KTLoss, VAELoss
 from processing import load_dataset
 from GPUtil import showUtilization as gpu_usage
+import wandb
 # Graph-based Knowledge Tracing: Modeling Student Proficiency Using Graph Neural Network.
 # For more information, please refer to https://dl.acm.org/doi/10.1145/3350546.3352513
 # Author: jhljx
 # Email: jhljx8918@gmail.com
+
+wandb.init(project="GKT", entity="suyeonnie")
+
+# wandb.config = {
+#   "lr": 0.001,
+#   "epochs": 20,
+#   "train-ratio": 0.8,
+#   "gamma": 0.3,
+#   "batch-size": 20
+# }
 
 
 parser = argparse.ArgumentParser()
@@ -70,6 +81,15 @@ args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 args.factor = not args.no_factor
 print(args)
+
+wandb.config.update({
+    'batch_size': args.batch_size, 
+    'lr': args.lr, 
+    'gamma': args.gamma, 
+    'train_ratio': args.train_ratio,
+    'val_ratio': args.val_ratio,
+    'epochs': args.epochs
+})
 
 random.seed(args.seed)
 np.random.seed(args.seed)
@@ -142,6 +162,8 @@ elif args.model == 'DKT':
 else:
     raise NotImplementedError(args.model + ' model is not implemented!')
 kt_loss = KTLoss()
+
+wandb.watch(model)
 
 # build optimizer
 optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -329,6 +351,9 @@ def train(epoch, best_val_loss):
                   'time: {:.4f}s'.format(time.time() - t), file=log)
         log.flush()
     res = np.mean(loss_val)
+
+    wandb.log({"auc_train": auc_train, "acc_train": acc_train})
+
     del loss_train
     del auc_train
     del acc_train
@@ -422,6 +447,9 @@ def test():
                   'auc_test: {:.10f}'.format(np.mean(auc_test)),
                   'acc_test: {:.10f}'.format(np.mean(acc_test)), file=log)
         log.flush()
+
+    wandb.log({"auc_test": auc_test, "acc_test": acc_test})
+
     del loss_test
     del auc_test
     del acc_test
