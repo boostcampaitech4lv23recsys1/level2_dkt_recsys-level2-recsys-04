@@ -45,7 +45,7 @@ class DecoderEmbedding(nn.Module):
         self.n_dims = n_dims
         self.seq_len = seq_len
         self.response_embed = nn.Embedding(n_responses, n_dims)
-        self.time_embed = nn.Linear(1, n_dims, bias=False)
+        # self.time_embed = nn.Linear(1, n_dims, bias=False)
         self.position_embed = nn.Embedding(seq_len, n_dims)
 
     def forward(self, responses):
@@ -118,8 +118,9 @@ class PlusSAINTModule(pl.LightningModule):
                                                   n_categories=Config.TOTAL_CAT,
                                                   n_dims=Config.EMBED_DIMS, seq_len=Config.MAX_SEQ)
         self.decoder_embedding = DecoderEmbedding(
-            n_responses=3, n_dims=Config.EMBED_DIMS, seq_len=Config.MAX_SEQ)
-        self.elapsed_time = nn.Linear(1, Config.EMBED_DIMS)
+            n_responses=3, n_dims=Config.EMBED_DIMS, seq_len=Config.MAX_SEQ
+        )
+        self.elapsed_time = nn.Linear(1, Config.EMBED_DIMS, bias=False)
         self.fc = nn.Linear(Config.EMBED_DIMS, 1)
 
     def forward(self, x, y):
@@ -150,10 +151,10 @@ class PlusSAINTModule(pl.LightningModule):
         input, labels = batch
         target_mask = (input["input_ids"] != 0)
         out = self(input, labels)
-        loss = self.loss(out.float(), labels.float())
         out = torch.masked_select(out, target_mask)
         out = torch.sigmoid(out)
         labels = torch.masked_select(labels, target_mask)
+        loss = self.loss(out.float(), labels.float())
         self.log("train_loss", loss, on_step=True, prog_bar=True)
         return {"loss": loss, "outs": out, "labels": labels}
 
@@ -170,28 +171,66 @@ class PlusSAINTModule(pl.LightningModule):
         input, labels = batch
         target_mask = (input["input_ids"] != 0)
         out = self(input, labels)
-        loss = self.loss(out.float(), labels.float())
         out = torch.masked_select(out, target_mask)
         out = torch.sigmoid(out)
         labels = torch.masked_select(labels, target_mask)
+        loss = self.loss(out.float(), labels.float())
         self.log("val_loss", loss, on_step=True, prog_bar=True)
-        output = {"outs": out, "labels": labels}
+        # output = {"outs": out, "labels": labels}
         return {"val_loss": loss, "outs": out, "labels": labels}
 
-    def validation_epoch_end(self, validation_ouput):
+    def validation_epoch_end(self, validation_output):
         out = np.concatenate([i["outs"].cpu().detach().numpy()
-                              for i in validation_ouput]).reshape(-1)
+                              for i in validation_output]).reshape(-1)
         labels = np.concatenate([i["labels"].cpu().detach().numpy()
-                                 for i in validation_ouput]).reshape(-1)
+                                 for i in validation_output]).reshape(-1)
         auc = roc_auc_score(labels, out)
         self.print("val auc", auc)
         self.log("val_auc", auc)
+
+    def test_step(self, batch, batch_ids):
+        input, labels = batch
+        breakpoint()
+        out = self(input, labels)
+        target_mask = (input["input_ids"] != 0)
+        breakpoint()
+        labels = torch.masked_select(labels, target_mask)
+        out = torch.masked_select(out, target_mask)
+        out = torch.sigmoid(out)
+        loss = self.loss(out.float(), labels.float())
+        self.log("test_loss", loss, on_step=True, prog_bar=True)
+        return {"test_loss": loss, "outs": out, "labels": labels}
+        
+    def test_epoch_end(self, test_output):
+        out = np.concatenate([i["outs"].cpu().detach().numpy()
+                              for i in test_output]).reshape(-1)
+        labels = np.concatenate([i["labels"].cpu().detach().numpy()
+                                 for i in test_output]).reshape(-1)
+        auc = roc_auc_score(labels, out)
+        self.print("test auc", auc)
+        self.log("test_auc", auc)
+
+    # def predict_step(self, batch, batch_idx):
+    #     input, labels = batch
+    #     target_mask = (input["input_ids"] != 0)
+    #     out = self(input, labels)
+    #     out = torch.masked_select(out, target_mask)
+    #     out = torch.sigmoid(out)
+    #     labels = torch.masked_select(labels, target_mask)
+    #     loss = self.loss(out.float(), labels.float())
+    #     self.log("val_loss", loss, on_step=True, prog_bar=True)
+    #     # output = {"outs": out, "labels": labels}
+    #     return {"val_loss": loss, "outs": out, "labels": labels}
 
 
 if __name__ == "__main__":
     train_loader, val_loader, test_loader = get_dataloaders()
     saint_plus = PlusSAINTModule()
-    trainer = pl.Trainer(gpus=-1, max_epochs=1)  # progress_bar_refresh_rate=21
+    trainer = pl.Trainer(gpus=-1, max_epochs=Config.EPOCHS)  # progress_bar_refresh_rate=21
     trainer.fit(model=saint_plus,
                 train_dataloaders=train_loader,
-                val_dataloaders=[val_loader, ])
+                val_dataloaders=val_loader)
+    trainer.test(
+        model=saint_plus,
+        dataloaders=test_loader
+    )

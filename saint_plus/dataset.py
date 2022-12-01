@@ -35,8 +35,13 @@ class DKTDataset(Dataset):
         seq_len = len(question_ids)
         exe_ids = np.zeros(self.max_seq, dtype=int)
         ans = np.zeros(self.max_seq, dtype=int)
-        elapsed_time = np.zeros(self.max_seq, dtype=int)
+        elapsed_time = np.zeros(self.max_seq, dtype=float)
         exe_cat = np.zeros(self.max_seq, dtype=int)
+
+        # exe_ids[:seq_len] = question_ids  # MHA에서 Mask 모양 고려했을 때, 이게 맞는 것 같음
+        # ans[:seq_len] = answers
+        # elapsed_time[:seq_len] = ela_time
+        # exe_cat[:seq_len] = exe_category
         if seq_len < self.max_seq:
             exe_ids[-seq_len:] = question_ids
             ans[-seq_len:] = answers
@@ -53,7 +58,7 @@ class DKTDataset(Dataset):
         # input_rtime = np.insert(elapsed_time, 0, 0)       
         # input_rtime = np.delete(input_rtime, -1)
 
-        self.input = {"input_ids": exe_ids, "input_rtime": elapsed_time.astype(np.int32), "input_cat": exe_cat}
+        self.input = {"input_ids": exe_ids, "input_rtime": elapsed_time, "input_cat": exe_cat}
         return self.input, ans
 
 
@@ -73,14 +78,18 @@ def get_dataloaders():
     train_df['KnowledgeTag'], _ = pd.factorize(train_df['KnowledgeTag'], sort=True)
     test_df['assessmentItemID'], _ = pd.factorize(test_df['assessmentItemID'], sort=True)
     test_df['KnowledgeTag'], _ = pd.factorize(test_df['KnowledgeTag'], sort=True)
+    train_df['assessmentItemID'] += 1  # padding 한 0 값이랑, 문제 라벨 0 이랑 구분하기 위해서 1 더해줌
+    test_df['assessmentItemID'] += 1
 
     elapse = train_df.loc[:, ['userID', 'Timestamp']].groupby('userID').diff(periods=1)['Timestamp']
     elapse = elapse.fillna(pd.Timedelta(seconds=0)).apply(lambda x: x.total_seconds()).astype(np.int32)
     elapse = elapse.apply(lambda x: x if x <= Config.MAX_EPLAPSED_TIME else Config.MAX_EPLAPSED_TIME)
+    elapse /= Config.MAX_EPLAPSED_TIME  # Normalize (ex. 0~600 -> 0~1로 바꿔줌) why? 나중에 임베딩 벡터에 600 곱해지면 너무 커지니까.
     train_df['prior_question_elapsed_time'] = elapse
     elapse = test_df.loc[:, ['userID', 'Timestamp']].groupby('userID').diff(periods=1)['Timestamp']
     elapse = elapse.fillna(pd.Timedelta(seconds=0)).apply(lambda x: x.total_seconds()).astype(np.int32)
     elapse = elapse.apply(lambda x: x if x <= Config.MAX_EPLAPSED_TIME else Config.MAX_EPLAPSED_TIME)
+    elapse /= Config.MAX_EPLAPSED_TIME
     test_df['prior_question_elapsed_time'] = elapse
 
     # grouping based on userID to get the data supplu
@@ -90,16 +99,17 @@ def get_dataloaders():
         .apply(lambda r: (r.assessmentItemID.values, r.answerCode.values,
                           r.prior_question_elapsed_time.values, r.KnowledgeTag.values))
 
-    test_group = test_df[["userID", "assessmentItemID", "answerCode", "prior_question_elapsed_time", "KnowledgeTag"]]\
-        .groupby("userID")\
-        .apply(lambda r: (r.assessmentItemID.values, r.answerCode.values,
-                          r.prior_question_elapsed_time.values, r.KnowledgeTag.values))
-    
     test_to_train_df = test_df.loc[test_df['answerCode'] != -1]  # Test 데이터 user 별 마지막 문제 제외한 데이터
     test_to_train_group = test_to_train_df[["userID", "assessmentItemID", "answerCode", "prior_question_elapsed_time", "KnowledgeTag"]]\
         .groupby("userID")\
         .apply(lambda r: (r.assessmentItemID.values, r.answerCode.values,
                             r.prior_question_elapsed_time.values, r.KnowledgeTag.values))
+
+    test_df.loc[test_df['answerCode'] == -1, 'answerCode'] = 1  # -1 -> 1
+    test_group = test_df[["userID", "assessmentItemID", "answerCode", "prior_question_elapsed_time", "KnowledgeTag"]]\
+        .groupby("userID")\
+        .apply(lambda r: (r.assessmentItemID.values, r.answerCode.values,
+                          r.prior_question_elapsed_time.values, r.KnowledgeTag.values))
     
 
     print("splitting")
@@ -140,7 +150,7 @@ def get_dataloaders():
                             num_workers=8,
                             shuffle=False)
     test_loader = DataLoader(test_dataset,
-                            batch_size=Config.BATCH_SIZE,
+                            batch_size=len(train_dataset),
                             num_workers=8,
                             shuffle=False)
 
