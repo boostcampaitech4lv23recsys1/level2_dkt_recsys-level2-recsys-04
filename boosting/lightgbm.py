@@ -1,4 +1,4 @@
-import xgboost as xgb
+import lightgbm as lgb
 import pandas as pd
 import numpy as np
 from sklearn import preprocessing
@@ -7,7 +7,7 @@ from sklearn.metrics import accuracy_score
 import os
 
 
-class Xg_boost():
+class lightgbm():
     def __init__(self, args):
         self.args = args
         self.model = xgb.XGBClassifier(learning_rate= self.args.learning_rate, n_estimators=self.args.iterations, max_depth = self.args.max_depth)
@@ -18,6 +18,7 @@ class Xg_boost():
         print("###start MODEL training ###")
         
         self.model.fit(self.train[FEATURE], self.train_value, verbose=100,early_stopping_rounds=100, eval_metric='auc',eval_set=[(self.valid[FEATURE], self.valid_value)])
+        _model = lgb.train({'objective': 'binary'}, lgb_train, valid_sets=[lgb_train, lgb_valid], verbose_eval=100, num_boost_round=500, early_stopping_rounds=100)
     
     def make_train_valid_feature(self,data):
         def data_argument(train):
@@ -80,18 +81,34 @@ class Xg_boost():
 
         _train = data[data['answerCode'] >= 0]
         _test = data[data['answerCode'] == -1]
-        # 데이터 증강하는 법.   
+        # 데이터 증강하는 법.
+        
 
         _train_x, _valid = data_argument(_train)
-        arg_train = []
-        now = _train_x
-        for _ in range(self.args.argument_times):
-            now, now1 = data_argument(now)
-            arg_train.append(data_merge(now, now1))
+        _train_x_1, _train_1 = data_argument(_train_x)
+        _train_x_2, _train_2 = data_argument(_train_x_1)
+        _train_x_3, _train_3 = data_argument(_train_x_2)
+        _train_x_4, _train_4 = data_argument(_train_x_3)
+        _train_x_5, _train_5 = data_argument(_train_x_4)
+        _train_x_6, _train_6 = data_argument(_train_x_5)
+        _train_x_7, _train_7 = data_argument(_train_x_6)
+        _train_x_8, _train_8 = data_argument(_train_x_7)
+        _train_x_9, _train_9 = data_argument(_train_x_8)
+        _train_x_10, _train_10 = data_argument(_train_x_9)        
+
         test = data_merge(_train, _test)
         valid = data_merge(_train_x, _valid)
-        train = pd.concat(arg_train)
-
+        train_1 = data_merge(_train_x_1, _train_1)
+        train_2 = data_merge(_train_x_2, _train_2)
+        train_3 = data_merge(_train_x_3, _train_3)
+        train_4 = data_merge(_train_x_4, _train_4)
+        train_5 = data_merge(_train_x_5, _train_5)
+        train_6 = data_merge(_train_x_6, _train_6)
+        train_7 = data_merge(_train_x_7, _train_7)
+        train_8 = data_merge(_train_x_8, _train_8)
+        train_9 = data_merge(_train_x_9, _train_9)
+        train_10 = data_merge(_train_x_10, _train_10)
+        train = pd.concat([train_1,train_2,train_3,train_4,train_5,train_6,train_7,train_8,train_9,train_10])
         train = train[train['answer_cnt'] >= 14] # test에는 최소 14개의 문제 표본이 있는 유저만 있음.
 
         self.train_value = train['answerCode']
