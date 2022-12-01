@@ -15,10 +15,21 @@ from models import GKT, MultiHeadAttention, VAE, DKT
 from metrics import KTLoss, VAELoss
 from processing import load_dataset
 from GPUtil import showUtilization as gpu_usage
+import wandb
 # Graph-based Knowledge Tracing: Modeling Student Proficiency Using Graph Neural Network.
 # For more information, please refer to https://dl.acm.org/doi/10.1145/3350546.3352513
 # Author: jhljx
 # Email: jhljx8918@gmail.com
+
+wandb.init(project="GKT", entity="suyeonnie")
+
+# wandb.config = {
+#   "lr": 0.001,
+#   "epochs": 20,
+#   "train-ratio": 0.8,
+#   "gamma": 0.3,
+#   "batch-size": 20
+# }
 
 
 parser = argparse.ArgumentParser()
@@ -50,8 +61,8 @@ parser.add_argument('--hard', action='store_true', default=False, help='Uses dis
 parser.add_argument('--no-factor', action='store_true', default=False, help='Disables factor graph model.')
 parser.add_argument('--prior', action='store_true', default=False, help='Whether to use sparsity prior.')
 parser.add_argument('--var', type=float, default=1, help='Output variance.')
-parser.add_argument('--epochs', type=int, default=50, help='Number of epochs to train.')
-parser.add_argument('--batch-size', type=int, default=16, help='Number of samples per batch.')
+parser.add_argument('--epochs', type=int, default=1, help='Number of epochs to train.')
+parser.add_argument('--batch-size', type=int, default=20, help='Number of samples per batch.')
 parser.add_argument('--train-ratio', type=float, default=0.9, help='The ratio of training samples in a dataset.')
 parser.add_argument('--val-ratio', type=float, default=0.1, help='The ratio of validation samples in a dataset.')
 parser.add_argument('--shuffle', type=bool, default=True, help='Whether to shuffle the dataset or not.')
@@ -70,6 +81,15 @@ args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 args.factor = not args.no_factor
 print(args)
+
+wandb.config.update({
+    'batch_size': args.batch_size, 
+    'lr': args.lr, 
+    'gamma': args.gamma, 
+    'train_ratio': args.train_ratio,
+    'val_ratio': args.val_ratio,
+    'epochs': args.epochs
+})
 
 random.seed(args.seed)
 np.random.seed(args.seed)
@@ -143,11 +163,14 @@ else:
     raise NotImplementedError(args.model + ' model is not implemented!')
 kt_loss = KTLoss()
 
+wandb.watch(model)
+
 # build optimizer
 optimizer = optim.Adam(model.parameters(), lr=args.lr)
 scheduler = lr_scheduler.StepLR(optimizer, step_size=args.lr_decay, gamma=args.gamma)
 
 # load model/optimizer/scheduler params
+# 과거에 실험했던 model / optimizer / scheduler -> load_stat_dict로 불러와서 거기서부터 학습할 수 있음
 if args.load_dir:
     if args.model == 'DKT':
         model_file_name = 'DKT'
@@ -328,6 +351,9 @@ def train(epoch, best_val_loss):
                   'time: {:.4f}s'.format(time.time() - t), file=log)
         log.flush()
     res = np.mean(loss_val)
+
+    wandb.log({"auc_train": auc_train, "acc_train": acc_train})
+
     del loss_train
     del auc_train
     del acc_train
@@ -421,6 +447,9 @@ def test():
                   'auc_test: {:.10f}'.format(np.mean(auc_test)),
                   'acc_test: {:.10f}'.format(np.mean(acc_test)), file=log)
         log.flush()
+
+    wandb.log({"auc_test": auc_test, "acc_test": acc_test})
+
     del loss_test
     del auc_test
     del acc_test

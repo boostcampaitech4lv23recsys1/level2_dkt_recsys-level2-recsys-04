@@ -43,7 +43,7 @@ def pad_collate(batch):
     return feature_pad, question_pad, answer_pad
 
 
-def load_dataset(file_path, batch_size, graph_type, dkt_graph_path=None, train_ratio=0.9, val_ratio=0.1, shuffle=True, model_type='GKT', use_binary=True, res_len=2, use_cuda=True):
+def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_type, dkt_graph_path=None, train_ratio=0.9, val_ratio=0.1, shuffle=True, model_type='GKT', use_binary=True, res_len=2, use_cuda=True):
     r"""
     Parameters:
         file_path: input file path of knowledge tracing data
@@ -67,9 +67,30 @@ def load_dataset(file_path, batch_size, graph_type, dkt_graph_path=None, train_r
     }
     DATA_PATH = '/opt/ml/input/data/'
     train = pd.read_csv(DATA_PATH + 'train_data.csv', dtype=dtype, parse_dates=['Timestamp'])
-    train = train.sort_values(by=['userID', 'Timestamp']).reset_index(drop=True)
     test = pd.read_csv(DATA_PATH + 'test_data.csv', dtype=dtype, parse_dates=['Timestamp'])
-    test = test.sort_values(by=['userID', 'Timestamp']).reset_index(drop=True)
+    
+
+    ########## 여기에서 우리가 썼던 train test 셋으로 나누고 train validaiton 분리 시킨다.
+    #test_valid_len (default ) = 3
+    
+    dat = pd.concat([train, test], axis = 0)
+    #dat = pd.concat([train, test.drop(test.tail(test_valid_len).index)], axis = 0)
+    dat = dat.sort_values(by = ['userID', 'Timestamp'])
+    
+    ########### 여기에서 max sequence 값을 데이터 선에서 짤라주자
+    dat = dat.groupby('userID', sort=False).tail(max_seq_len_limit)
+    
+    
+    train = dat[dat['answerCode'] >= 0]
+    #test = test.sort_values(by = ['userID', 'Timestamp'])
+    #test = test.groupby('userID', sort=False).tail(test_valid_len)
+    test = test.groupby('userID', sort=False).tail(max_seq_len_limit)
+
+    #######train vaild split
+    #user_final_time = train.groupby('userID')['Timestamp'].max()
+    #train['train_valid'] = train.apply(lambda x : -1 if x.Timestamp == user_final_time[x.userID] else x['answerCode'], axis = 1)
+    #valid = train[train['train_valid'] < 0]
+    #train = train[train['train_valid'] >= 0]
 
     # if "KnowledgeTag" not in df.columns:
     #     raise KeyError(f"The column 'KnowledgeTag' was not found on {file_path}")
@@ -105,6 +126,11 @@ def load_dataset(file_path, batch_size, graph_type, dkt_graph_path=None, train_r
         test['KTag_wiht_answer'] = test['KTag'] * res_len + test['answerCode'] - 1
 
 
+    #######train vaild split
+    train = train.sort_values(by = ['userID', 'Timestamp'])
+    valid = train.groupby('userID', sort=False).tail(test_valid_len)
+    train = train.drop(train.tail(test_valid_len).index)  
+
     # Step 4 - Convert to a sequence per user id and shift features 1 timestep
     train_feature_list = []
     train_question_list = []
@@ -129,6 +155,8 @@ def load_dataset(file_path, batch_size, graph_type, dkt_graph_path=None, train_r
         test_answer_list.append(series['answerCode'].eq(1).astype('int').tolist())
         test_seq_len_list.append(series['answerCode'].shape[0])
 
+    
+        
     train.groupby('userID').apply(train_get_data)
     test.groupby('userID').apply(test_get_data)
 
@@ -161,7 +189,7 @@ def load_dataset(file_path, batch_size, graph_type, dkt_graph_path=None, train_r
 
     train_dataset, val_dataset = torch.utils.data.random_split(train_dataset, [train_size, val_size])
     print('train_size: ', train_size, 'val_size: ', val_size, 'test_size: ', test_size)
-
+    
     train_data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=pad_collate)
     valid_data_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=pad_collate)
     # 나중을 위해 shuffle=False로, batch_size=test_size로 한 번에
