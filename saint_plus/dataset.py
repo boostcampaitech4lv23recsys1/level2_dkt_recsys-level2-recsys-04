@@ -105,7 +105,7 @@ def get_dataloaders():
         .apply(lambda r: (r.assessmentItemID.values, r.answerCode.values,
                             r.prior_question_elapsed_time.values, r.KnowledgeTag.values))
 
-    test_df.loc[test_df['answerCode'] == -1, 'answerCode'] = 1  # -1 -> 1
+    test_df.loc[test_df['answerCode'] == -1, 'answerCode'] = 2  # -1 그대로 두면 embedding 단계에서 error 발생
     test_group = test_df[["userID", "assessmentItemID", "answerCode", "prior_question_elapsed_time", "KnowledgeTag"]]\
         .groupby("userID")\
         .apply(lambda r: (r.assessmentItemID.values, r.answerCode.values,
@@ -150,7 +150,7 @@ def get_dataloaders():
                             num_workers=8,
                             shuffle=False)
     test_loader = DataLoader(test_dataset,
-                            batch_size=len(train_dataset),
+                            batch_size=Config.BATCH_SIZE,  # len(train_dataset)
                             num_workers=8,
                             shuffle=False)
 

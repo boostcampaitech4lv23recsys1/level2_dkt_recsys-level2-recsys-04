@@ -22,3 +22,4 @@ logs
 
 # saint_plus 모델 내부 파일
 /saint_plus/lightning_logs
+/saint_plus/submission
