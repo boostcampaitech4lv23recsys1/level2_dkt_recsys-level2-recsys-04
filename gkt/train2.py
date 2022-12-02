@@ -15,10 +15,21 @@ from models import GKT, MultiHeadAttention, VAE, DKT
 from metrics import KTLoss, VAELoss
 from processing import load_dataset
 from GPUtil import showUtilization as gpu_usage
+import wandb
 # Graph-based Knowledge Tracing: Modeling Student Proficiency Using Graph Neural Network.
 # For more information, please refer to https://dl.acm.org/doi/10.1145/3350546.3352513
 # Author: jhljx
 # Email: jhljx8918@gmail.com
+
+wandb.init(project="GKT", entity="suyeonnie")
+
+# wandb.config = {
+#   "lr": 0.001,
+#   "epochs": 20,
+#   "train-ratio": 0.8,
+#   "gamma": 0.3,
+#   "batch-size": 20
+# }
 
 
 parser = argparse.ArgumentParser()
@@ -70,6 +81,15 @@ args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 args.factor = not args.no_factor
 print(args)
+
+wandb.config.update({
+    'batch_size': args.batch_size, 
+    'lr': args.lr, 
+    'gamma': args.gamma, 
+    'train_ratio': args.train_ratio,
+    'val_ratio': args.val_ratio,
+    'epochs': args.epochs
+})
 
 random.seed(args.seed)
 np.random.seed(args.seed)
@@ -143,11 +163,14 @@ else:
     raise NotImplementedError(args.model + ' model is not implemented!')
 kt_loss = KTLoss()
 
+wandb.watch(model)
+
 # build optimizer
 optimizer = optim.Adam(model.parameters(), lr=args.lr)
 scheduler = lr_scheduler.StepLR(optimizer, step_size=args.lr_decay, gamma=args.gamma)
 
 # load model/optimizer/scheduler params
+# 과거에 실험했던 model / optimizer / scheduler -> load_stat_dict로 불러와서 거기서부터 학습할 수 있음
 if args.load_dir:
     if args.model == 'DKT':
         model_file_name = 'DKT'
@@ -156,12 +179,12 @@ if args.load_dir:
     else:
         raise NotImplementedError(args.model + ' model is not implemented!')
     model_file = os.path.join(args.load_dir, model_file_name + '.pt')
-    optimizer_file = os.path.join(args.load_dir, model_file_name + '-Optimizer.pt')
-    scheduler_file = os.path.join(args.load_dir, model_file_name + '-Scheduler.pt')
+    optimizer_file = os.path.join(save_dir, model_file_name + '-Optimizer.pt')
+    scheduler_file = os.path.join(save_dir, model_file_name + '-Scheduler.pt')
     model.load_state_dict(torch.load(model_file))
     optimizer.load_state_dict(torch.load(optimizer_file))
     scheduler.load_state_dict(torch.load(scheduler_file))
-    # args.save_dir = False
+    args.save_dir = False
 
 # build optimizer
 optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -228,6 +251,9 @@ def train(epoch, best_val_loss):
         scheduler.step()
         optimizer.zero_grad()
         del loss
+        print(gpu_usage())
+        gc.collect()
+        torch.cuda.empty_cache()
         print('cost time: ', str(time.time() - t1))
 
     loss_val = []
@@ -294,9 +320,6 @@ def train(epoch, best_val_loss):
               'time: {:.4f}s'.format(time.time() - t))
     if args.save_dir and np.mean(loss_val) < best_val_loss:
         print('Best model so far, saving...')
-        model_file = os.path.join(save_dir, model_file_name + '.pt')
-        optimizer_file = os.path.join(save_dir, model_file_name + '-Optimizer.pt')
-        scheduler_file = os.path.join(save_dir, model_file_name + '-Scheduler.pt')
         torch.save(model.state_dict(), model_file)
         torch.save(optimizer.state_dict(), optimizer_file)
         torch.save(scheduler.state_dict(), scheduler_file)
@@ -328,6 +351,9 @@ def train(epoch, best_val_loss):
                   'time: {:.4f}s'.format(time.time() - t), file=log)
         log.flush()
     res = np.mean(loss_val)
+
+    wandb.log({"auc_train": auc_train, "acc_train": acc_train})
+
     del loss_train
     del auc_train
     del acc_train
@@ -368,13 +394,14 @@ def test():
             
             # submission 파일 생성
             submission = [u_pred_list[last_idx].item() for u_pred_list, last_idx in zip(pred_res, test_last_q_idx)]
-            # if args.load_dir:
-            #     pd.DataFrame({"prediction": submission}).to_csv(
-            #         os.path.join(args.load_dir, 'submission.csv'), index_label="id"
-            #     )
-            pd.DataFrame({"prediction": submission}).to_csv(
-                os.path.join(save_dir, 'submission.csv'), index_label="id"
-            )
+            if args.load_dir:
+                pd.DataFrame({"prediction": submission}).to_csv(
+                    os.path.join(args.load_dir, 'submission.csv'), index_label="id"
+                )
+            else:
+                pd.DataFrame({"prediction": submission}).to_csv(
+                    os.path.join(save_dir, 'submission.csv'), index_label="id"
+                )
 
             loss_kt, auc, acc = kt_loss(pred_res, answers)
             loss_kt = float(loss_kt.cpu().detach().numpy())
@@ -420,6 +447,9 @@ def test():
                   'auc_test: {:.10f}'.format(np.mean(auc_test)),
                   'acc_test: {:.10f}'.format(np.mean(acc_test)), file=log)
         log.flush()
+
+    wandb.log({"auc_test": auc_test, "acc_test": acc_test})
+
     del loss_test
     del auc_test
     del acc_test
