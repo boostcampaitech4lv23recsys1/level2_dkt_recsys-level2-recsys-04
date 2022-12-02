@@ -118,6 +118,20 @@ def get_dataloaders():
     train = pd.concat([train, test_to_train_group])  # Test에서 -1 제외한 user 별 데이터 Train으로 concat
     test = test_group.copy()
 
+    #data augmentation
+    train_origin = train.copy()
+    n= 1
+    print(f'======origin length      : {len(train)}======')
+    for i in range(Config.AUGMENTATION):
+        print(f'START {n}th AUGMENTATION')
+        tem = train_origin.drop_duplicates(subset = ["user_id"],keep = "last")
+        train_origin = train_origin.drop(index=tem.index)
+        train_origin['user_id'] += train_origin['user_id'].nunique()
+        train = pd.concat([train, train_origin], axis = 0)
+        print(f'END   {n}th AUGMENTATION')
+        n += 1
+    print(f'======after augmentation : {len(train)}======')
+    
     # 메모리 청소하는 부분인듯? GKT 모델에도 써보면 좋을듯
     del train_df, test_df, test_to_train_df, elapse, train_group, test_group, test_to_train_group
     gc.collect()
