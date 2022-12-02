@@ -150,12 +150,14 @@ class PlusSAINTModule(pl.LightningModule):
         return torch.optim.Adam(self.parameters())
 
     def training_step(self, batch, batch_ids):
-        input, labels = batch
-        target_mask = (input["input_ids"] != 0)
-        out = self(input, labels)
-        out = torch.masked_select(out, target_mask)
+        input, input_labels, labels = batch
+        # target_mask = (input["input_ids"] != 0)
+        out = self(input, input_labels)
+        # out = torch.masked_select(out, target_mask)
+        labels = labels[:, -1]
+        out = out[:, -1]
         out = torch.sigmoid(out)
-        labels = torch.masked_select(labels, target_mask)
+        # labels = torch.masked_select(labels, target_mask)
         loss = self.loss(out.float(), labels.float())
         self.log("train_loss", loss, on_step=True, prog_bar=True)
         return {"loss": loss, "outs": out, "labels": labels}
@@ -170,12 +172,14 @@ class PlusSAINTModule(pl.LightningModule):
         self.log("train_auc", auc)
 
     def validation_step(self, batch, batch_ids):
-        input, labels = batch
-        target_mask = (input["input_ids"] != 0)
-        out = self(input, labels)
-        out = torch.masked_select(out, target_mask)
+        input, input_labels, labels = batch
+        # target_mask = (input["input_ids"] != 0)
+        out = self(input, input_labels)
+        # out = torch.masked_select(out, target_mask)
+        labels = labels[:, -1]
+        out = out[:, -1]
         out = torch.sigmoid(out)
-        labels = torch.masked_select(labels, target_mask)
+        # labels = torch.masked_select(labels, target_mask)
         loss = self.loss(out.float(), labels.float())
         self.log("val_loss", loss, on_step=True, prog_bar=True)
         # output = {"outs": out, "labels": labels}
@@ -191,12 +195,15 @@ class PlusSAINTModule(pl.LightningModule):
         self.log("val_auc", auc)
 
     def test_step(self, batch, batch_ids):
-        input, labels = batch
-        out = self(input, labels)
+        input, input_labels, labels = batch
+        out = self(input, input_labels)
         # target_mask = (input["input_ids"] != 0)
-        target_mask = (labels == 2)
-        labels = torch.masked_select(labels, target_mask)
-        out = torch.masked_select(out, target_mask)
+        # target_mask = (labels == 2)
+        # labels = torch.masked_select(labels, target_mask)
+        # out = torch.masked_select(out, target_mask)
+        labels = labels[:, -1]
+        out = out[:, -1]
+        breakpoint()
         out = torch.sigmoid(out)
         loss = self.loss(out.float(), labels.float())
         self.log("test_loss", loss, on_step=True, prog_bar=True)

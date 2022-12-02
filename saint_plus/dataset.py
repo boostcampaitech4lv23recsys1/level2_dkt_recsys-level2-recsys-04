@@ -14,8 +14,9 @@ class DKTDataset(Dataset):
         self.data = []
         for id in self.samples.index:
             exe_ids, answers, ela_time, categories = self.samples[id]
+            input_answers = answers[:] + 1  ## padding과 start-token 0 값과 구별하기 위해, 틀린 문제 - 1 /  맞은 문제 - 2 로 설정
             if len(exe_ids) > max_seq:
-                self.data.append((exe_ids[-max_seq:], answers[-max_seq:], ela_time[-max_seq:], categories[-max_seq:]))
+                self.data.append((exe_ids[-max_seq:], answers[-max_seq:], input_answers[-max_seq:], ela_time[-max_seq:], categories[-max_seq:]))
                 # if is_test:  # Test 데이터의 경우 증강하면 안되기 때문에, 마지막 max_seq 길이만큼의 데이터만 가져옴
                 #     self.data.append((exe_ids[-max_seq:], answers[-max_seq:], ela_time[-max_seq:], categories[-max_seq:]))
                 # else:
@@ -23,7 +24,7 @@ class DKTDataset(Dataset):
                 #         self.data.append(
                 #             (exe_ids[l:l+max_seq], answers[l:l+max_seq], ela_time[l:l+max_seq], categories[l:l+max_seq]))
             elif len(exe_ids) <= self.max_seq and len(exe_ids) > Config.MIN_SEQ:
-                self.data.append((exe_ids, answers, ela_time, categories))
+                self.data.append((exe_ids, answers, input_answers, ela_time, categories))
             else:
                 continue
 
@@ -31,11 +32,12 @@ class DKTDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        question_ids, answers, ela_time, exe_category = self.data[idx]
+        question_ids, answers, input_answers, ela_time, exe_category = self.data[idx]
         seq_len = len(question_ids)
         exe_ids = np.zeros(self.max_seq, dtype=int)
         ans = np.zeros(self.max_seq, dtype=int)
-        elapsed_time = np.zeros(self.max_seq, dtype=float)
+        input_ans = np.zeros(self.max_seq, dtype=int)
+        elapsed_time = np.zeros(self.max_seq, dtype=int) # normalize 했으면 float
         exe_cat = np.zeros(self.max_seq, dtype=int)
 
         # exe_ids[:seq_len] = question_ids  # MHA에서 Mask 모양 고려했을 때, 이게 맞는 것 같음
@@ -44,22 +46,28 @@ class DKTDataset(Dataset):
         # exe_cat[:seq_len] = exe_category
         if seq_len < self.max_seq:
             exe_ids[-seq_len:] = question_ids
-            ans[-seq_len:] = answers
+            ans[-seq_len:] = answers[:]
+            input_ans[-seq_len:] = input_answers[:]
             elapsed_time[-seq_len:] = ela_time
             exe_cat[-seq_len:] = exe_category
         else:
             exe_ids[:] = question_ids[-self.max_seq:]
             ans[:] = answers[-self.max_seq:]
+            input_ans[:] = input_answers[-self.max_seq:]
             elapsed_time[:] = ela_time[-self.max_seq:]
             exe_cat[:] = exe_category[-self.max_seq:]
 
         # 한 칸 앞으로 당기는거 이미 앞에서 진행한 작업이라 skip 해놓음
-        # input_rtime = np.zeros(self.max_seq, dtype=int)
-        # input_rtime = np.insert(elapsed_time, 0, 0)       
-        # input_rtime = np.delete(input_rtime, -1)
+        # 이라고 생각했는데 아님, 이거 디코더 인풋 타임스탬프 하나 땡겨주는 작업이었음
+        # 정답고 시간 태그 타임스탬프 한 칸 땡겨주기
+        input_rtime = np.zeros(self.max_seq, dtype=int)
+        input_rtime = np.insert(elapsed_time, 0, -1)       
+        input_rtime = np.delete(input_rtime, -1)
 
-        self.input = {"input_ids": exe_ids, "input_rtime": elapsed_time, "input_cat": exe_cat}
-        return self.input, ans
+        input_ans = np.insert(input_ans, 0, 0)       
+        input_ans = np.delete(input_ans, -1)
+        self.input = {"input_ids": exe_ids, "input_rtime": input_rtime, "input_cat": exe_cat}
+        return self.input, input_ans, ans
 
 
 def get_dataloaders():
@@ -84,13 +92,15 @@ def get_dataloaders():
     elapse = train_df.loc[:, ['userID', 'Timestamp']].groupby('userID').diff(periods=1)['Timestamp']
     elapse = elapse.fillna(pd.Timedelta(seconds=0)).apply(lambda x: x.total_seconds()).astype(np.int32)
     elapse = elapse.apply(lambda x: x if x <= Config.MAX_EPLAPSED_TIME else Config.MAX_EPLAPSED_TIME)
-    elapse /= Config.MAX_EPLAPSED_TIME  # Normalize (ex. 0~600 -> 0~1로 바꿔줌) why? 나중에 임베딩 벡터에 600 곱해지면 너무 커지니까.
+    # elapse /= Config.MAX_EPLAPSED_TIME  # Normalize (ex. 0~600 -> 0~1로 바꿔줌) why? 나중에 임베딩 벡터에 600 곱해지면 너무 커지니까. 근데 이거 안하고 해봐도 좋을듯
     train_df['prior_question_elapsed_time'] = elapse
     elapse = test_df.loc[:, ['userID', 'Timestamp']].groupby('userID').diff(periods=1)['Timestamp']
     elapse = elapse.fillna(pd.Timedelta(seconds=0)).apply(lambda x: x.total_seconds()).astype(np.int32)
     elapse = elapse.apply(lambda x: x if x <= Config.MAX_EPLAPSED_TIME else Config.MAX_EPLAPSED_TIME)
-    elapse /= Config.MAX_EPLAPSED_TIME
+    # elapse /= Config.MAX_EPLAPSED_TIME
     test_df['prior_question_elapsed_time'] = elapse
+
+    
 
     # grouping based on userID to get the data supplu
     print("Grouping users...")
@@ -105,7 +115,7 @@ def get_dataloaders():
         .apply(lambda r: (r.assessmentItemID.values, r.answerCode.values,
                             r.prior_question_elapsed_time.values, r.KnowledgeTag.values))
 
-    test_df.loc[test_df['answerCode'] == -1, 'answerCode'] = 2  # -1 그대로 두면 embedding 단계에서 error 발생
+    # test_df.loc[test_df['answerCode'] == -1, 'answerCode'] = 2  # -1 그대로 두면 embedding 단계에서 error 발생
     test_group = test_df[["userID", "assessmentItemID", "answerCode", "prior_question_elapsed_time", "KnowledgeTag"]]\
         .groupby("userID")\
         .apply(lambda r: (r.assessmentItemID.values, r.answerCode.values,
@@ -119,20 +129,21 @@ def get_dataloaders():
     test = test_group.copy()
 
     #data augmentation
-    train_origin = train.copy()
-    n= 1
-    print(f'======origin length      : {len(train)}======')
-    for i in range(Config.AUGMENTATION):
-        print(f'START {n}th AUGMENTATION')
-        tem = train_origin.drop_duplicates(subset = ["user_id"],keep = "last")
-        train_origin = train_origin.drop(index=tem.index)
-        train_origin['user_id'] += train_origin['user_id'].nunique()
-        train = pd.concat([train, train_origin], axis = 0)
-        print(f'END   {n}th AUGMENTATION')
-        n += 1
-    print(f'======after augmentation : {len(train)}======')
+    if Config.DATA_AUG:
+        train_origin = train.copy()
+        n= 1
+        print(f'======origin length      : {len(train)}======')
+        for i in range(Config.AUGMENTATION):
+            print(f'START {n}th AUGMENTATION')
+            tem = train_origin.duplicated(subset = ["userID"], keep = "last")
+            train_origin = train_origin.drop(index=tem.index)
+            train_origin['userID'] += train_origin['userID'].nunique()
+            train = pd.concat([train, train_origin], axis = 0)
+            print(f'END   {n}th AUGMENTATION')
+            n += 1
+        print(f'======after augmentation : {len(train)}======')
     
-    # 메모리 청소하는 부분인듯? GKT 모델에도 써보면 좋을듯
+    # 메모리 청소하는 부분인듯? GKT 모델에도 써보면 좋을듯 -> 이미 있음
     del train_df, test_df, test_to_train_df, elapse, train_group, test_group, test_to_train_group
     gc.collect()
 
