@@ -1,6 +1,8 @@
 from config import Config
 from dataset import get_dataloaders
 
+import os
+import datetime
 import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
@@ -190,10 +192,9 @@ class PlusSAINTModule(pl.LightningModule):
 
     def test_step(self, batch, batch_ids):
         input, labels = batch
-        breakpoint()
         out = self(input, labels)
-        target_mask = (input["input_ids"] != 0)
-        breakpoint()
+        # target_mask = (input["input_ids"] != 0)
+        target_mask = (labels == 2)
         labels = torch.masked_select(labels, target_mask)
         out = torch.masked_select(out, target_mask)
         out = torch.sigmoid(out)
@@ -204,11 +205,18 @@ class PlusSAINTModule(pl.LightningModule):
     def test_epoch_end(self, test_output):
         out = np.concatenate([i["outs"].cpu().detach().numpy()
                               for i in test_output]).reshape(-1)
-        labels = np.concatenate([i["labels"].cpu().detach().numpy()
-                                 for i in test_output]).reshape(-1)
-        auc = roc_auc_score(labels, out)
-        self.print("test auc", auc)
-        self.log("test_auc", auc)
+        print('-------save-file-------')
+        file_path = '/opt/ml/input/code/saint_plus/submission'
+        file_name = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + '-submission.csv'
+        pd.DataFrame({"prediction": out}).to_csv(
+            os.path.join(file_path, file_name), index_label="id"
+        )
+
+        # labels = np.concatenate([i["labels"].cpu().detach().numpy()
+        #                          for i in test_output]).reshape(-1)
+        # auc = roc_auc_score(labels, out)
+        # self.print("test auc", auc)
+        # self.log("test_auc", auc)
 
     # def predict_step(self, batch, batch_idx):
     #     input, labels = batch

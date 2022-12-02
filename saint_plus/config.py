@@ -8,7 +8,7 @@ class Config:
     EMBED_DIMS = 512
     ENC_HEADS = DEC_HEADS = 1
     NUM_ENCODER = NUM_DECODER = 1
-    EPOCHS = 2
+    EPOCHS = 1
     BATCH_SIZE = 32
     TRAIN_FILE = "/opt/ml/input/data/train_data.csv"
     TEST_FILE = "/opt/ml/input/data/test_data.csv"
