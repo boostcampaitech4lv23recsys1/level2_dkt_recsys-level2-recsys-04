@@ -31,34 +31,52 @@ class KTDataset(Dataset):
         return len(self.features)
 
 
+
 def pad_collate(batch):
     #batch(split) -> feature_pad, question_pad, answer_pad
-    (features, questions, answers) = zip(*batch) # features : [[],[],[]..]
+    (features, questions, answers) = zip(*batch)
     features = [torch.LongTensor(feat) for feat in features]
     questions = [torch.LongTensor(qt) for qt in questions]
     answers = [torch.LongTensor(ans) for ans in answers]
-
-    max_seq_len = 100
-
-    feature_pad = []
-    question_pad = []
-    answer_pad = []
-    for i, feature in enumerate(features):
-        pre_padded = torch.zeros(max_seq_len)
-        pre_padded[-len(feature) :] = feature
-        feature_pad.append(pre_padded)
-
-    for i, question in enumerate(questions):
-        pre_padded = torch.zeros(max_seq_len)
-        pre_padded[-len(question) :] = question
-        question_pad.append(pre_padded)
-
-    for i, answer in enumerate(answers):
-        pre_padded = torch.zeros(max_seq_len)
-        pre_padded[-len(answers) :] = answers
-        answer_pad.append(pre_padded)
-
+    feature_pad = pad_sequence(features, batch_first=True, padding_value=-1)
+    question_pad = pad_sequence(questions, batch_first=True, padding_value=-1)
+    answer_pad = pad_sequence(answers, batch_first=True, padding_value=-1)
     return feature_pad, question_pad, answer_pad
+
+# def pad_collate(batch):
+#     #batch(split) -> feature_pad, question_pad, answer_pad
+#     (features, questions, answers) = zip(*batch) # features : [[],[],[]..]
+#     features = [torch.LongTensor(feat) for feat in features]
+#     questions = [torch.LongTensor(qt) for qt in questions]
+#     answers = [torch.LongTensor(ans) for ans in answers]
+#     max_seq_len = 100
+
+#     feature_pad = []
+#     question_pad = []
+#     answer_pad = []
+#     for i, feature in enumerate(features):
+#         pre_padded = torch.zeros(max_seq_len, dtype=torch.int32)
+#         #print(len(feature))
+#         pre_padded[-len(feature) :] = feature
+#         feature_pad.append(pre_padded)
+#     feature_pad = torch.stack(feature_pad)
+
+#     for i, question in enumerate(questions):
+#         pre_padded = torch.zeros(max_seq_len, dtype=torch.int32)
+#         pre_padded[-len(question) :] = question
+#         question_pad.append(pre_padded)
+#     question_pad = torch.stack(question_pad)
+
+#     for i, answer in enumerate(answers):
+#         pre_padded = torch.zeros(max_seq_len, dtype=torch.int32)
+#         pre_padded[-len(answer) :] = answer
+#         answer_pad.append(pre_padded)
+#     answer_pad = torch.stack(answer_pad)
+#     #print(feature_pad)
+
+#     #breakpoint()
+
+#     return feature_pad, question_pad, answer_pad
 
 
 def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_type, dkt_graph_path=None, train_ratio=0.9, val_ratio=0.1, shuffle=True, model_type='GKT', use_binary=True, res_len=2, use_cuda=True):
@@ -78,17 +96,17 @@ def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_t
     NOTE: stole some code from https://github.com/lccasagrande/Deep-Knowledge-Tracing/blob/master/deepkt/data_util.py
     """
     # read csv data
-    dtype = {
-        'userID': 'int16',
-        'answerCode': 'int8',
-        'KnowledgeTag': 'int16'
-    }
+    # dtype = {
+    #     'userID': 'int16',
+    #     'answerCode': 'int8',
+    #     'KnowledgeTag': 'int16'
+    # }
     DATA_PATH = '/opt/ml/input/data/GKT/' # '/opt/ml/input/data/'
 
-    train = pd.read_csv(DATA_PATH + 'train_data.csv', dtype=dtype, parse_dates=['Timestamp'])
-    valid = pd.read_csv(DATA_PATH + 'valid_data.csv', dtype=dtype, parse_dates=['Timestamp'])
-    test = pd.read_csv(DATA_PATH + 'test_data.csv', dtype=dtype, parse_dates=['Timestamp'])
-    
+    train = pd.read_csv(DATA_PATH + 'train_data.csv')#, dtype=dtype, parse_dates=['Timestamp'])
+    valid = pd.read_csv(DATA_PATH + 'valid_data.csv')#, dtype=dtype, parse_dates=['Timestamp'])
+    test = pd.read_csv(DATA_PATH + 'test_data.csv')#, dtype=dtype, parse_dates=['Timestamp'])
+
     tag = pd.concat([train, valid, test], axis = 0)['KnowledgeTag'].unique()
     tag2idx = {tag:idx for idx, tag in enumerate(tag)}
     train['KTag'] = train['KnowledgeTag'].map(tag2idx)
@@ -173,12 +191,12 @@ def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_t
     val_size = tot_size - train_size
     test_size = len(test_seq_len_list)
 
-    
+    #breakpoint()
     train_data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=pad_collate)
     valid_data_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=pad_collate)
     # 나중을 위해 shuffle=False로, batch_size=test_size로 한 번에
     test_data_loader = DataLoader(test_dataset, batch_size=test_size, shuffle=False, collate_fn=pad_collate)
-
+    #breakpoint()
     graph = None
     if model_type == 'GKT':
         if graph_type == 'Dense':
