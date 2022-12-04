@@ -14,7 +14,7 @@ from torch.autograd import Variable
 from models import GKT, MultiHeadAttention, VAE, DKT
 from metrics import KTLoss, VAELoss
 from processing import load_dataset
-from GPUtil import showUtilization as gpu_usage
+#from GPUtil import showUtilization as gpu_usage
 # Graph-based Knowledge Tracing: Modeling Student Proficiency Using Graph Neural Network.
 # For more information, please refer to https://dl.acm.org/doi/10.1145/3350546.3352513
 # Author: jhljx
@@ -115,7 +115,9 @@ dataset_path = os.path.join(args.data_dir, args.data_file)
 dkt_graph_path = os.path.join(args.dkt_graph_dir, args.dkt_graph)
 if not os.path.exists(dkt_graph_path):
     dkt_graph_path = None
+
 # test_last_q_idx -> 유저 별 마지막으로 푼 문제 idx 담은 list
+# concept_num : 태그 최댓값.
 concept_num, graph, train_loader, valid_loader, test_loader, test_last_q_idx = load_dataset(
     dataset_path, args.max_seq_len_limit ,args.test_valid_len,args.batch_size, args.graph_type, dkt_graph_path=dkt_graph_path,
     train_ratio=args.train_ratio, val_ratio=args.val_ratio, shuffle=args.shuffle,
