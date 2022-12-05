@@ -118,21 +118,27 @@ class PlusSAINTModule(pl.LightningModule):
                                                         n_multihead=2, dropout=0.0)
         self.encoder_embedding = EncoderEmbedding(n_exercises=Config.TOTAL_EXE,
                                                   n_categories=Config.TOTAL_CAT,
-                                                  n_dims=Config.EMBED_DIMS, seq_len=Config.MAX_SEQ)
-        self.decoder_embedding = DecoderEmbedding(
-            n_responses=3, n_dims=Config.EMBED_DIMS, seq_len=Config.MAX_SEQ
-        )
+                                                  n_dims=Config.EMBED_DIMS, 
+                                                  seq_len=Config.MAX_SEQ)
+        self.decoder_embedding = DecoderEmbedding(n_responses=3, 
+                                                n_dims=Config.EMBED_DIMS, 
+                                                seq_len=Config.MAX_SEQ)
+
         self.elapsed_time = nn.Linear(1, Config.EMBED_DIMS, bias=False)
         self.fc = nn.Linear(Config.EMBED_DIMS, 1)
 
     def forward(self, x, y):
-        enc = self.encoder_embedding(
-            exercises=x["input_ids"], categories=x['input_cat'])
+        #embedding part
+        enc = self.encoder_embedding(exercises=x["input_ids"], 
+                                    categories=x['input_cat'])
         dec = self.decoder_embedding(responses=y)
+
+
         elapsed_time = x["input_rtime"].unsqueeze(-1).float()
         ela_time = self.elapsed_time(elapsed_time)
         dec = dec + ela_time
-        # this encoder
+        
+        # this is encoder
         encoder_output = self.encoder_layer(input_k=enc,
                                             input_q=enc,
                                             input_v=enc)
@@ -203,7 +209,7 @@ class PlusSAINTModule(pl.LightningModule):
         # out = torch.masked_select(out, target_mask)
         labels = labels[:, -1]
         out = out[:, -1]
-        breakpoint()
+        # breakpoint()
         out = torch.sigmoid(out)
         loss = self.loss(out.float(), labels.float())
         self.log("test_loss", loss, on_step=True, prog_bar=True)
@@ -225,7 +231,7 @@ class PlusSAINTModule(pl.LightningModule):
         # self.print("test auc", auc)
         # self.log("test_auc", auc)
 
-    # def predict_step(self, batch, batch_idx):
+    # def predict_step(self, batch, batch_idx, dataloader_idx=0):
     #     input, labels = batch
     #     target_mask = (input["input_ids"] != 0)
     #     out = self(input, labels)
@@ -249,3 +255,7 @@ if __name__ == "__main__":
         model=saint_plus,
         dataloaders=test_loader
     )
+    # trainer.predict(
+    #     model = saint_plus, 
+    #     dataloaders = test_loader
+    # )
