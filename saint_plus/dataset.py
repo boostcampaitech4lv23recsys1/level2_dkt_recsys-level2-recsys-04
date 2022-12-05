@@ -92,12 +92,13 @@ def get_dataloaders():
     elapse = train_df.loc[:, ['userID', 'Timestamp']].groupby('userID').diff(periods=1)['Timestamp']
     elapse = elapse.fillna(pd.Timedelta(seconds=0)).apply(lambda x: x.total_seconds()).astype(np.int32)
     elapse = elapse.apply(lambda x: x if x <= Config.MAX_EPLAPSED_TIME else Config.MAX_EPLAPSED_TIME)
-    elapse /= Config.MAX_EPLAPSED_TIME  # Normalize (ex. 0~600 -> 0~1로 바꿔줌) why? 나중에 임베딩 벡터에 600 곱해지면 너무 커지니까. 근데 이거 안하고 해봐도 좋을듯
+    # elapse /= Config.MAX_EPLAPSED_TIME  # Normalize (ex. 0~600 -> 0~1로 바꿔줌) why? 나중에 임베딩 벡터에 600 곱해지면 너무 커지니까. 근데 이거 안하고 해봐도 좋을듯
     train_df['prior_question_elapsed_time'] = elapse
+
     elapse = test_df.loc[:, ['userID', 'Timestamp']].groupby('userID').diff(periods=1)['Timestamp']
     elapse = elapse.fillna(pd.Timedelta(seconds=0)).apply(lambda x: x.total_seconds()).astype(np.int32)
     elapse = elapse.apply(lambda x: x if x <= Config.MAX_EPLAPSED_TIME else Config.MAX_EPLAPSED_TIME)
-    elapse /= Config.MAX_EPLAPSED_TIME
+    # elapse /= Config.MAX_EPLAPSED_TIME
     test_df['prior_question_elapsed_time'] = elapse
 
     
@@ -128,20 +129,20 @@ def get_dataloaders():
     train = pd.concat([train, test_to_train_group])  # Test에서 -1 제외한 user 별 데이터 Train으로 concat
     test = test_group.copy()
 
-    #data augmentation
-    if Config.DATA_AUG:
-        train_origin = train.copy()
-        n= 1
-        print(f'======origin length      : {len(train)}======')
-        breakpoint()
-        for i in range(Config.DATA_AUG):
-            print(f'START {n}th AUGMENTATION')
-            train_origin['userID'] += 7439+1
-            train = pd.concat([train, train_origin], axis = 0)
-            print(f'END   {n}th AUGMENTATION')
-            n += 1
-        print(f'======after augmentation : {len(train)}======')
-        breakpoint()
+    # #data augmentation
+    # if Config.DATA_AUG:
+    #     train_origin = train.copy()
+    #     n= 1
+    #     print(f'======origin length      : {len(train)}======')
+    #     for i in range(Config.DATA_AUG):
+    #         print(f'START {n}th AUGMENTATION')
+    #         train_origin = np.delete(train_origin[][],-1)
+    #         train_origin.index += max(train.index) +1
+    #         train = pd.concat([train, train_origin], axis = 0)
+    #         print(f'END   {n}th AUGMENTATION')
+    #         n += 1
+    #     print(f'======after augmentation : {len(train)}======')
+
     # 메모리 청소하는 부분인듯? GKT 모델에도 써보면 좋을듯 -> 이미 있음
     del train_df, test_df, test_to_train_df, elapse, train_group, test_group, test_to_train_group
     gc.collect()

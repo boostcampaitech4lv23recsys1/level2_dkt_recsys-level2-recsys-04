@@ -8,7 +8,7 @@ class Config:
     EMBED_DIMS = 512
     ENC_HEADS = DEC_HEADS = 1
     NUM_ENCODER = NUM_DECODER = 1
-    EPOCHS = 1
+    EPOCHS = 10
     BATCH_SIZE = 32
     TRAIN_FILE = "/opt/ml/input/data/train_data.csv"
     TEST_FILE = "/opt/ml/input/data/test_data.csv"
@@ -17,5 +17,6 @@ class Config:
     TOTAL_CAT = 912   # 대회 dataset 서로 다른 KnowledgeTag 개수
     MAX_EPLAPSED_TIME = 600  # elapsed_time = min(MAX_ELAPSED_TIME, (현재 문제 풀이시간 - 이전 문제 풀이시간))
     VALID_SIZE = 0.1  # Train과 Valid split 비율
-    DATA_AUG = 1  # Data augmentation 할지 말지 설정
+    DATA_AUG = False  # Data augmentation 할지 말지 설정
     AUGMENTATION = 5 
+    LR = 0.01

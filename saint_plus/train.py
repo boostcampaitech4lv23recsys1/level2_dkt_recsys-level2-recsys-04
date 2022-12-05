@@ -153,7 +153,7 @@ class PlusSAINTModule(pl.LightningModule):
         return out.squeeze()
 
     def configure_optimizers(self):
-        return torch.optim.Adam(self.parameters())
+        return torch.optim.Adam(self.parameters(), lr= Config.LR)
 
     def training_step(self, batch, batch_ids):
         input, input_labels, labels = batch
