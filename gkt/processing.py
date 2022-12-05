@@ -4,6 +4,7 @@ import os
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, TensorDataset, DataLoader
+
 from torch.nn.utils.rnn import pad_sequence
 from utils import build_dense_graph
 import random
@@ -14,7 +15,6 @@ warnings.filterwarnings(action='ignore')
 # For more information, please refer to https://dl.acm.org/doi/10.1145/3350546.3352513
 # Author: jhljx
 # Email: jhljx8918@gmail.com
-
 
 class KTDataset(Dataset):
     #데이터를 features / questions / answers 로 분할하여 저장(type : list)

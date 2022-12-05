@@ -14,6 +14,8 @@ from torch.autograd import Variable
 from models import GKT, MultiHeadAttention, VAE, DKT
 from metrics import KTLoss, VAELoss
 from processing import load_dataset
+
+from sklearn.metrics import roc_auc_score
 #from GPUtil import showUtilization as gpu_usage
 # Graph-based Knowledge Tracing: Modeling Student Proficiency Using Graph Neural Network.
 # For more information, please refer to https://dl.acm.org/doi/10.1145/3350546.3352513
@@ -50,7 +52,7 @@ parser.add_argument('--dropout', type=float, default=0, help='Dropout rate (1 - 
 parser.add_argument('--bias', type=bool, default=True, help='Whether to add bias for neural network layers.')
 parser.add_argument('--binary', type=bool, default=True, help='Whether only use 0/1 for results.')
 parser.add_argument('--var', type=float, default=1, help='Output variance.')
-parser.add_argument('--epochs', type=int, default=2, help='Number of epochs to train.')
+parser.add_argument('--epochs', type=int, default=5, help='Number of epochs to train.')
 parser.add_argument('--batch-size', type=int, default=64, help='Number of samples per batch.')
 parser.add_argument('--lr', type=float, default=0.01, help='Initial learning rate.')
 parser.add_argument('--lr-decay', type=int, default=200, help='After how epochs to decay LR by a factor of gamma.')
@@ -249,6 +251,10 @@ def train(epoch, best_val_loss):
     if graph_model is not None:
         graph_model.eval()
     model.eval()
+    
+    pred_valids = []
+    real_valids = []
+    
     with torch.no_grad():
         for batch_idx, (features, questions, answers) in enumerate(valid_loader):
             if args.cuda:
@@ -263,9 +269,17 @@ def train(epoch, best_val_loss):
 
             # submission 값 얻기
             
+            
             ####################
 
-            loss_kt, auc, acc = kt_loss(pred_res, answers)
+            pred_valid = [u_pred_list[last_idx].item() for u_pred_list, last_idx in zip(pred_res, valid_last_q_idx[batch_idx*64:(batch_idx+1)*64])]
+            real_valid = [u_pred_list[last_idx+1].item() for u_pred_list, last_idx in zip(answers, valid_last_q_idx[batch_idx*64:(batch_idx+1)*64])]
+            
+            loss_kt, auc, acc = kt_loss(pred_res, answers)      
+
+            pred_valids += pred_valid
+            real_valids += real_valid
+
             loss_kt = float(loss_kt.cpu().detach().numpy())
             kt_val.append(loss_kt)
             if auc != -1 and acc != -1:
@@ -280,6 +294,13 @@ def train(epoch, best_val_loss):
                 loss = loss_kt + loss_vae
             loss_val.append(loss)
             del loss
+        print('True val auc score !!!!!')
+        #breakpoint()
+        print(roc_auc_score(real_valids, pred_valids))
+        print('')
+
+    
+
     if args.model == 'GKT' and args.graph_type == 'VAE':
         print('Epoch: {:04d}'.format(epoch),
               'loss_train: {:.10f}'.format(np.mean(loss_train)),
