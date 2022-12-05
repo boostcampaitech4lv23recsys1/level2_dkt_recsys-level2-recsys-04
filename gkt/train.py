@@ -14,6 +14,8 @@ from torch.autograd import Variable
 from models import GKT, MultiHeadAttention, VAE, DKT
 from metrics import KTLoss, VAELoss
 from processing import load_dataset
+
+from sklearn.metrics import roc_auc_score
 #from GPUtil import showUtilization as gpu_usage
 # Graph-based Knowledge Tracing: Modeling Student Proficiency Using Graph Neural Network.
 # For more information, please refer to https://dl.acm.org/doi/10.1145/3350546.3352513
@@ -24,6 +26,8 @@ from processing import load_dataset
 parser = argparse.ArgumentParser()
 #--no-cuda default = True 에서 False로 변경
 #--batch-size default = 원래 128이였는데, 줄여가면서 돌려보고 되는 것중에 최대값으로?
+
+# 파일 관련 파라미터(거의 변동x)
 parser.add_argument('--no-cuda', action='store_false', default=False, help='Disables CUDA training.')
 parser.add_argument('--seed', type=int, default=42, help='Random seed.')
 parser.add_argument('--data-dir', type=str, default='data', help='Data dir for loading input data.')
@@ -33,6 +37,9 @@ parser.add_argument('-graph-save-dir', type=str, default='graphs', help='Dir for
 parser.add_argument('--load-dir', type=str, default='', help='Where to load the trained model if finetunning. ' + 'Leave empty to train from scratch')
 parser.add_argument('--dkt-graph-dir', type=str, default='dkt-graph', help='Where to load the pretrained dkt graph.')
 parser.add_argument('--dkt-graph', type=str, default='dkt_graph.txt', help='DKT graph data file name.')
+
+
+# 모델 관련 파라미터
 parser.add_argument('--model', type=str, default='GKT', help='Model type to use, support GKT and DKT.')
 parser.add_argument('--hid-dim', type=int, default=32, help='Dimension of hidden knowledge states.')
 parser.add_argument('--emb-dim', type=int, default=32, help='Dimension of concept embedding.')
@@ -44,20 +51,23 @@ parser.add_argument('--graph-type', type=str, default='Dense', help='The type of
 parser.add_argument('--dropout', type=float, default=0, help='Dropout rate (1 - keep probability).')
 parser.add_argument('--bias', type=bool, default=True, help='Whether to add bias for neural network layers.')
 parser.add_argument('--binary', type=bool, default=True, help='Whether only use 0/1 for results.')
+parser.add_argument('--var', type=float, default=1, help='Output variance.')
+parser.add_argument('--epochs', type=int, default=5, help='Number of epochs to train.')
+parser.add_argument('--batch-size', type=int, default=64, help='Number of samples per batch.')
+parser.add_argument('--lr', type=float, default=0.01, help='Initial learning rate.')
+parser.add_argument('--lr-decay', type=int, default=200, help='After how epochs to decay LR by a factor of gamma.')
+parser.add_argument('--gamma', type=float, default=0.5, help='LR decay factor.')
+
+parser.add_argument('--train-ratio', type=float, default=0.9, help='The ratio of training samples in a dataset.')
+parser.add_argument('--val-ratio', type=float, default=0.1, help='The ratio of validation samples in a dataset.')
+parser.add_argument('--shuffle', type=bool, default=True, help='Whether to shuffle the dataset or not.')
+
+# 그외 잘 모르겠는 파라미터(중요할까??)
 parser.add_argument('--result-type', type=int, default=12, help='Number of results types when multiple results are used.')
 parser.add_argument('--temp', type=float, default=0.5, help='Temperature for Gumbel softmax.')
 parser.add_argument('--hard', action='store_true', default=False, help='Uses discrete samples in training forward pass.')
 parser.add_argument('--no-factor', action='store_true', default=False, help='Disables factor graph model.')
 parser.add_argument('--prior', action='store_true', default=False, help='Whether to use sparsity prior.')
-parser.add_argument('--var', type=float, default=1, help='Output variance.')
-parser.add_argument('--epochs', type=int, default=2, help='Number of epochs to train.')
-parser.add_argument('--batch-size', type=int, default=64, help='Number of samples per batch.')
-parser.add_argument('--train-ratio', type=float, default=0.9, help='The ratio of training samples in a dataset.')
-parser.add_argument('--val-ratio', type=float, default=0.1, help='The ratio of validation samples in a dataset.')
-parser.add_argument('--shuffle', type=bool, default=True, help='Whether to shuffle the dataset or not.')
-parser.add_argument('--lr', type=float, default=0.01, help='Initial learning rate.')
-parser.add_argument('--lr-decay', type=int, default=200, help='After how epochs to decay LR by a factor of gamma.')
-parser.add_argument('--gamma', type=float, default=0.5, help='LR decay factor.')
 parser.add_argument('--test', type=bool, default=False, help='Whether to test for existed model.')
 parser.add_argument('--test-model-dir', type=str, default='logs/expGKT', help='Existed model file dir.')
 ## max sequence list 값 설정
@@ -118,7 +128,7 @@ if not os.path.exists(dkt_graph_path):
 
 # test_last_q_idx -> 유저 별 마지막으로 푼 문제 idx 담은 list
 # concept_num : 태그 최댓값.
-concept_num, graph, train_loader, valid_loader, test_loader, test_last_q_idx = load_dataset(
+concept_num, graph, train_loader, valid_loader, test_loader, test_last_q_idx, valid_last_q_idx = load_dataset(
     dataset_path, args.max_seq_len_limit ,args.test_valid_len,args.batch_size, args.graph_type, dkt_graph_path=dkt_graph_path,
     train_ratio=args.train_ratio, val_ratio=args.val_ratio, shuffle=args.shuffle,
     model_type=args.model, use_cuda=args.cuda 
@@ -241,6 +251,10 @@ def train(epoch, best_val_loss):
     if graph_model is not None:
         graph_model.eval()
     model.eval()
+    
+    pred_valids = []
+    real_valids = []
+    
     with torch.no_grad():
         for batch_idx, (features, questions, answers) in enumerate(valid_loader):
             if args.cuda:
@@ -255,9 +269,17 @@ def train(epoch, best_val_loss):
 
             # submission 값 얻기
             
+            
             ####################
 
-            loss_kt, auc, acc = kt_loss(pred_res, answers)
+            pred_valid = [u_pred_list[last_idx].item() for u_pred_list, last_idx in zip(pred_res, valid_last_q_idx[batch_idx*64:(batch_idx+1)*64])]
+            real_valid = [u_pred_list[last_idx+1].item() for u_pred_list, last_idx in zip(answers, valid_last_q_idx[batch_idx*64:(batch_idx+1)*64])]
+            
+            loss_kt, auc, acc = kt_loss(pred_res, answers)      
+
+            pred_valids += pred_valid
+            real_valids += real_valid
+
             loss_kt = float(loss_kt.cpu().detach().numpy())
             kt_val.append(loss_kt)
             if auc != -1 and acc != -1:
@@ -272,6 +294,13 @@ def train(epoch, best_val_loss):
                 loss = loss_kt + loss_vae
             loss_val.append(loss)
             del loss
+        print('True val auc score !!!!!')
+        #breakpoint()
+        print(roc_auc_score(real_valids, pred_valids))
+        print('')
+
+    
+
     if args.model == 'GKT' and args.graph_type == 'VAE':
         print('Epoch: {:04d}'.format(epoch),
               'loss_train: {:.10f}'.format(np.mean(loss_train)),
