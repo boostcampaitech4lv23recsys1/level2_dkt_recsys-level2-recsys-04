@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from sklearn.metrics import accuracy_score, roc_auc_score
 from torch_geometric.nn.models import LightGCN
-
+from torch.optim import lr_scheduler
 
 def build(n_node, weight=None, logger=None, **kwargs):
     """
@@ -36,6 +36,8 @@ def train(
     valid_data=None,
     n_epoch=100,
     learning_rate=0.01,
+    lr_decay = 10,
+    gamma = 0.9,
     use_wandb=False,
     weight=None,
     logger=None,
@@ -43,7 +45,7 @@ def train(
     model.train()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=lr_decay, gamma=gamma)
     if not os.path.exists(weight):
         os.makedirs(weight)
 
@@ -94,6 +96,8 @@ def train(
                     {"model": model.state_dict(), "epoch": e + 1},
                     os.path.join(weight, f"best_model.pt"),
                 )
+
+    scheduler.step()
     torch.save(
         {"model": model.state_dict(), "epoch": e + 1},
         os.path.join(weight, f"last_model.pt"),

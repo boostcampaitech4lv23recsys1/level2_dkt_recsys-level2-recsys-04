@@ -14,7 +14,7 @@ from torch.autograd import Variable
 from models import GKT, MultiHeadAttention, VAE, DKT
 from metrics import KTLoss, VAELoss
 from processing import load_dataset
-from GPUtil import showUtilization as gpu_usage
+#from GPUtil import showUtilization as gpu_usage
 # Graph-based Knowledge Tracing: Modeling Student Proficiency Using Graph Neural Network.
 # For more information, please refer to https://dl.acm.org/doi/10.1145/3350546.3352513
 # Author: jhljx
@@ -50,12 +50,12 @@ parser.add_argument('--hard', action='store_true', default=False, help='Uses dis
 parser.add_argument('--no-factor', action='store_true', default=False, help='Disables factor graph model.')
 parser.add_argument('--prior', action='store_true', default=False, help='Whether to use sparsity prior.')
 parser.add_argument('--var', type=float, default=1, help='Output variance.')
-parser.add_argument('--epochs', type=int, default=1, help='Number of epochs to train.')
-parser.add_argument('--batch-size', type=int, default=20, help='Number of samples per batch.')
+parser.add_argument('--epochs', type=int, default=2, help='Number of epochs to train.')
+parser.add_argument('--batch-size', type=int, default=64, help='Number of samples per batch.')
 parser.add_argument('--train-ratio', type=float, default=0.9, help='The ratio of training samples in a dataset.')
 parser.add_argument('--val-ratio', type=float, default=0.1, help='The ratio of validation samples in a dataset.')
 parser.add_argument('--shuffle', type=bool, default=True, help='Whether to shuffle the dataset or not.')
-parser.add_argument('--lr', type=float, default=0.001, help='Initial learning rate.')
+parser.add_argument('--lr', type=float, default=0.01, help='Initial learning rate.')
 parser.add_argument('--lr-decay', type=int, default=200, help='After how epochs to decay LR by a factor of gamma.')
 parser.add_argument('--gamma', type=float, default=0.5, help='LR decay factor.')
 parser.add_argument('--test', type=bool, default=False, help='Whether to test for existed model.')
@@ -115,7 +115,9 @@ dataset_path = os.path.join(args.data_dir, args.data_file)
 dkt_graph_path = os.path.join(args.dkt_graph_dir, args.dkt_graph)
 if not os.path.exists(dkt_graph_path):
     dkt_graph_path = None
+
 # test_last_q_idx -> 유저 별 마지막으로 푼 문제 idx 담은 list
+# concept_num : 태그 최댓값.
 concept_num, graph, train_loader, valid_loader, test_loader, test_last_q_idx = load_dataset(
     dataset_path, args.max_seq_len_limit ,args.test_valid_len,args.batch_size, args.graph_type, dkt_graph_path=dkt_graph_path,
     train_ratio=args.train_ratio, val_ratio=args.val_ratio, shuffle=args.shuffle,
