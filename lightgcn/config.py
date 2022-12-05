@@ -3,7 +3,7 @@
 # ====================================================
 class CFG:
     use_cuda_if_available = True
-    user_wandb = True
+    user_wandb = False
     wandb_kwargs = dict(project="dkt-gcn")
 
     # data
@@ -12,19 +12,22 @@ class CFG:
 
     # dump
     output_dir = "./output/"
-    pred_file = "submission.csv"
+    pred_file = "submission_1128.csv"
 
     # build
-    embedding_dim = 64  # int
-    num_layers = 1  # int
+    embedding_dim = 128  # int, 64
+    num_layers = 3  # int, 1
     alpha = None  # Optional[Union[float, Tensor]]
     build_kwargs = {}  # other arguments
     weight = "./weight/best_model.pt"
 
     # train
-    n_epoch = 30
-    learning_rate = 0.05
-    weight_basepath = "./weight"
+    n_epoch = 139 # 30
+    learning_rate = 0.01 # 0.05
+    # lr_decay, gamma는 추가한 것, 스케줄러.
+    lr_decay = 5 
+    gamma = 0.9
+    weight_basepath = "./weight" 
 
 
 logging_conf = {  # only used when 'user_wandb==False'
