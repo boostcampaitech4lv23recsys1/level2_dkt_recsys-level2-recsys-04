@@ -77,32 +77,12 @@ def get_dataloaders():
         'KnowledgeTag': 'int16',
     }
     print("loading csv.....")
-    train_df = pd.read_csv(Config.TRAIN_FILE, usecols=[0, 1, 3, 4, 5], dtype=dtypes, parse_dates=['Timestamp'])  # TestID 빼고 볼러옴
-    test_df = pd.read_csv(Config.TEST_FILE, usecols=[0, 1, 3, 4, 5], dtype=dtypes, parse_dates=['Timestamp'])
-    train_df = train_df.sort_values(by=['userID', 'Timestamp']).reset_index(drop=True)
-    test_df = test_df.sort_values(by=['userID', 'Timestamp']).reset_index(drop=True)
-    
-    train_df['assessmentItemID'], _ = pd.factorize(train_df['assessmentItemID'], sort=True)
-    train_df['KnowledgeTag'], _ = pd.factorize(train_df['KnowledgeTag'], sort=True)
-    test_df['assessmentItemID'], _ = pd.factorize(test_df['assessmentItemID'], sort=True)
-    test_df['KnowledgeTag'], _ = pd.factorize(test_df['KnowledgeTag'], sort=True)
-    train_df['assessmentItemID'] += 1  # padding 한 0 값이랑, 문제 라벨 0 이랑 구분하기 위해서 1 더해줌
-    test_df['assessmentItemID'] += 1
 
-    elapse = train_df.loc[:, ['userID', 'Timestamp']].groupby('userID').diff(periods=1)['Timestamp']
-    elapse = elapse.fillna(pd.Timedelta(seconds=0)).apply(lambda x: x.total_seconds()).astype(np.int32)
-    elapse = elapse.apply(lambda x: x if x <= Config.MAX_EPLAPSED_TIME else Config.MAX_EPLAPSED_TIME)
-    # elapse /= Config.MAX_EPLAPSED_TIME  # Normalize (ex. 0~600 -> 0~1로 바꿔줌) why? 나중에 임베딩 벡터에 600 곱해지면 너무 커지니까. 근데 이거 안하고 해봐도 좋을듯
-    train_df['prior_question_elapsed_time'] = elapse
+    ### HSEUNEH_SAINTdata.ipynb 돌리면 "전처리" + "증강" csv 생성 ###
 
-    elapse = test_df.loc[:, ['userID', 'Timestamp']].groupby('userID').diff(periods=1)['Timestamp']
-    elapse = elapse.fillna(pd.Timedelta(seconds=0)).apply(lambda x: x.total_seconds()).astype(np.int32)
-    elapse = elapse.apply(lambda x: x if x <= Config.MAX_EPLAPSED_TIME else Config.MAX_EPLAPSED_TIME)
-    # elapse /= Config.MAX_EPLAPSED_TIME
-    test_df['prior_question_elapsed_time'] = elapse
-
-    
-
+    train_df = pd.read_csv(Config.TRAIN_FILE)
+    test_df = pd.read_csv(Config.TEST_FILE)
+    breakpoint()
     # grouping based on userID to get the data supplu
     print("Grouping users...")
     train_group = train_df[["userID", "assessmentItemID", "answerCode", "prior_question_elapsed_time", "KnowledgeTag"]]\
@@ -110,6 +90,7 @@ def get_dataloaders():
         .apply(lambda r: (r.assessmentItemID.values, r.answerCode.values,
                           r.prior_question_elapsed_time.values, r.KnowledgeTag.values))
 
+    breakpoint()
     test_to_train_df = test_df.loc[test_df['answerCode'] != -1]  # Test 데이터 user 별 마지막 문제 제외한 데이터
     test_to_train_group = test_to_train_df[["userID", "assessmentItemID", "answerCode", "prior_question_elapsed_time", "KnowledgeTag"]]\
         .groupby("userID")\
@@ -129,22 +110,10 @@ def get_dataloaders():
     train = pd.concat([train, test_to_train_group])  # Test에서 -1 제외한 user 별 데이터 Train으로 concat
     test = test_group.copy()
 
-    # #data augmentation
-    # if Config.DATA_AUG:
-    #     train_origin = train.copy()
-    #     n= 1
-    #     print(f'======origin length      : {len(train)}======')
-    #     for i in range(Config.DATA_AUG):
-    #         print(f'START {n}th AUGMENTATION')
-    #         train_origin = np.delete(train_origin[][],-1)
-    #         train_origin.index += max(train.index) +1
-    #         train = pd.concat([train, train_origin], axis = 0)
-    #         print(f'END   {n}th AUGMENTATION')
-    #         n += 1
-    #     print(f'======after augmentation : {len(train)}======')
+    breakpoint()
 
     # 메모리 청소하는 부분인듯? GKT 모델에도 써보면 좋을듯 -> 이미 있음
-    del train_df, test_df, test_to_train_df, elapse, train_group, test_group, test_to_train_group
+    del train_df, test_df, test_to_train_df, train_group, test_group, test_to_train_group
     gc.collect()
 
 
@@ -161,6 +130,8 @@ def get_dataloaders():
     # n_skills = train_df.assessmentItemID.nunique()
     # print("no. of skills :", n_skills)
     # print("shape after exlusion:", train_df.shape)
+ 
+
 
     train_dataset = DKTDataset(train, max_seq=Config.MAX_SEQ)
     val_dataset = DKTDataset(val, max_seq=Config.MAX_SEQ)

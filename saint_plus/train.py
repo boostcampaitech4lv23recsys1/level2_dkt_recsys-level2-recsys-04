@@ -162,9 +162,10 @@ class PlusSAINTModule(pl.LightningModule):
         # out = torch.masked_select(out, target_mask)
         labels = labels[:, -1]
         out = out[:, -1]
-        out = torch.sigmoid(out)
-        # labels = torch.masked_select(labels, target_mask)
+
         loss = self.loss(out.float(), labels.float())
+        out = torch.sigmoid(out)        
+        # labels = torch.masked_select(labels, target_mask)
         self.log("train_loss", loss, on_step=True, prog_bar=True)
         return {"loss": loss, "outs": out, "labels": labels}
 
@@ -184,9 +185,9 @@ class PlusSAINTModule(pl.LightningModule):
         # out = torch.masked_select(out, target_mask)
         labels = labels[:, -1]
         out = out[:, -1]
+        loss = self.loss(out.float(), labels.float())
         out = torch.sigmoid(out)
         # labels = torch.masked_select(labels, target_mask)
-        loss = self.loss(out.float(), labels.float())
         self.log("val_loss", loss, on_step=True, prog_bar=True)
         # output = {"outs": out, "labels": labels}
         return {"val_loss": loss, "outs": out, "labels": labels}
@@ -209,9 +210,10 @@ class PlusSAINTModule(pl.LightningModule):
         # out = torch.masked_select(out, target_mask)
         labels = labels[:, -1]
         out = out[:, -1]
-        # breakpoint()
-        out = torch.sigmoid(out)
+
         loss = self.loss(out.float(), labels.float())
+        out = torch.sigmoid(out)
+        # breakpoint()
         self.log("test_loss", loss, on_step=True, prog_bar=True)
         return {"test_loss": loss, "outs": out, "labels": labels}
         
@@ -220,7 +222,7 @@ class PlusSAINTModule(pl.LightningModule):
                               for i in test_output]).reshape(-1)
         print('-------save-file-------')
         file_path = '/opt/ml/input/code/saint_plus/submission'
-        file_name = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + '-submission.csv'
+        file_name = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S') + f',{Config.AUG},{Config.EPOCHS},{Config.EMBED_DIMS},{Config.ENC_HEADS},{Config.NUM_ENCODER},{Config.LR}'+ '-submission.csv'
         pd.DataFrame({"prediction": out}).to_csv(
             os.path.join(file_path, file_name), index_label="id"
         )
