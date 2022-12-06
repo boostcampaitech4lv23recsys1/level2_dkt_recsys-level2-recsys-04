@@ -14,7 +14,7 @@ class Config:
     MAX_EPLAPSED_TIME = 100  # elapsed_time = min(MAX_ELAPSED_TIME, (현재 문제 풀이시간 - 이전 문제 풀이시간))
     VALID_SIZE = 0.1  # Train과 Valid split 비율
     # DATA_AUG = 2  # Data augmentation 할지 말지 설정
-    AUG = 30
+    AUG = 5
     EPOCHS = 10
     EMBED_DIMS = 512
     ENC_HEADS = DEC_HEADS = 1

@@ -71,18 +71,13 @@ class DKTDataset(Dataset):
 
 
 def get_dataloaders():
-    dtypes = {
-        'userID': 'int16',
-        'answerCode': 'int8',
-        'KnowledgeTag': 'int16',
-    }
-    print("loading csv.....")
 
-    ### HSEUNEH_SAINTdata.ipynb 돌리면 "전처리" + "증강" csv 생성 ###
+    print("loading csv.....")
+    ### HSEUNEH_SAINT.ipynb 돌리면 "전처리" + "증강" csv 생성 ###
 
     train_df = pd.read_csv(Config.TRAIN_FILE)
     test_df = pd.read_csv(Config.TEST_FILE)
-    breakpoint()
+
     # grouping based on userID to get the data supplu
     print("Grouping users...")
     train_group = train_df[["userID", "assessmentItemID", "answerCode", "prior_question_elapsed_time", "KnowledgeTag"]]\
@@ -90,7 +85,7 @@ def get_dataloaders():
         .apply(lambda r: (r.assessmentItemID.values, r.answerCode.values,
                           r.prior_question_elapsed_time.values, r.KnowledgeTag.values))
 
-    breakpoint()
+
     test_to_train_df = test_df.loc[test_df['answerCode'] != -1]  # Test 데이터 user 별 마지막 문제 제외한 데이터
     test_to_train_group = test_to_train_df[["userID", "assessmentItemID", "answerCode", "prior_question_elapsed_time", "KnowledgeTag"]]\
         .groupby("userID")\
@@ -103,6 +98,8 @@ def get_dataloaders():
         .apply(lambda r: (r.assessmentItemID.values, r.answerCode.values,
                           r.prior_question_elapsed_time.values, r.KnowledgeTag.values))
     
+    # breakpoint()
+
 
     print("splitting")
     # Test 데이터의 user가 Valid로 들어가면, Test user가 학습되지 않기 때문에, 최초의 Train 데이터에서 Split 진행
@@ -110,26 +107,11 @@ def get_dataloaders():
     train = pd.concat([train, test_to_train_group])  # Test에서 -1 제외한 user 별 데이터 Train으로 concat
     test = test_group.copy()
 
-    breakpoint()
+    # breakpoint()
 
     # 메모리 청소하는 부분인듯? GKT 모델에도 써보면 좋을듯 -> 이미 있음
     del train_df, test_df, test_to_train_df, train_group, test_group, test_to_train_group
     gc.collect()
-
-
-    # print("shape of train :", train_df.shape)
-    # print("shape of val :", test_df.shape)
-
-    # train_df = train_df[train_df.content_type_id == 0]
-    # train_df.prior_question_elapsed_time.fillna(0, inplace=True)
-    # train_df.prior_question_elapsed_time /= 1000
-    # train_df.prior_question_elapsed_time.clip(lower=0,upper=300,inplace=True)
-    # train_df.prior_question_elapsed_time = train_df.prior_question_elapsed_time.astype(np.int)
-    
-    # train_df = train_df.sort_values(["timestamp"], ascending=True).reset_index(drop=True)
-    # n_skills = train_df.assessmentItemID.nunique()
-    # print("no. of skills :", n_skills)
-    # print("shape after exlusion:", train_df.shape)
  
 
 
