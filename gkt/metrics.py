@@ -35,6 +35,7 @@ class KTLoss(nn.Module):
             y_true = real_answers[answer_mask].cpu().detach().numpy()
             y_pred = pred_one[answer_mask].cpu().detach().numpy()
             auc = roc_auc_score(y_true, y_pred)  # may raise ValueError
+            #breakpoint()
             output = torch.cat((pred_zero[answer_mask].reshape(-1, 1), pred_one[answer_mask].reshape(-1, 1)), dim=1)
             label = real_answers[answer_mask].reshape(-1, 1)
             acc = accuracy(output, label)

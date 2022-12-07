@@ -4,6 +4,7 @@ import os
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, TensorDataset, DataLoader
+
 from torch.nn.utils.rnn import pad_sequence
 from utils import build_dense_graph
 import random
@@ -14,7 +15,6 @@ warnings.filterwarnings(action='ignore')
 # For more information, please refer to https://dl.acm.org/doi/10.1145/3350546.3352513
 # Author: jhljx
 # Email: jhljx8918@gmail.com
-
 
 class KTDataset(Dataset):
     #데이터를 features / questions / answers 로 분할하여 저장(type : list)
@@ -103,9 +103,9 @@ def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_t
     # }
     DATA_PATH = '/opt/ml/input/data/GKT/' # '/opt/ml/input/data/'
 
-    train = pd.read_csv(DATA_PATH + 'train_data.csv')#, dtype=dtype, parse_dates=['Timestamp'])
-    valid = pd.read_csv(DATA_PATH + 'valid_data.csv')#, dtype=dtype, parse_dates=['Timestamp'])
-    test = pd.read_csv(DATA_PATH + 'test_data.csv')#, dtype=dtype, parse_dates=['Timestamp'])
+    train = pd.read_csv(DATA_PATH + 'train_data2.csv')#, dtype=dtype, parse_dates=['Timestamp'])
+    valid = pd.read_csv(DATA_PATH + 'valid_data2.csv')#, dtype=dtype, parse_dates=['Timestamp'])
+    test = pd.read_csv(DATA_PATH + 'test_data2.csv')#, dtype=dtype, parse_dates=['Timestamp'])
 
     tag = pd.concat([train, valid, test], axis = 0)['KnowledgeTag'].unique()
     tag2idx = {tag:idx for idx, tag in enumerate(tag)}
@@ -184,6 +184,7 @@ def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_t
     test_dataset = KTDataset(test_feature_list, test_question_list, test_answer_list)
 
     # user 별 마지막으로 푼 문제 index 저장
+    valid_last_q_idx = [len(q)-2 for q, _, _ in valid_dataset]
     test_last_q_idx = [len(q)-2 for q, _, _ in test_dataset]
 
     tot_size = len(train_seq_len_list)
@@ -193,7 +194,7 @@ def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_t
 
     #breakpoint()
     train_data_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=pad_collate)
-    valid_data_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=pad_collate)
+    valid_data_loader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, collate_fn=pad_collate)
     # 나중을 위해 shuffle=False로, batch_size=test_size로 한 번에
     test_data_loader = DataLoader(test_dataset, batch_size=test_size, shuffle=False, collate_fn=pad_collate)
     #breakpoint()
@@ -208,7 +209,7 @@ def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_t
         if use_cuda and graph_type in ['Dense', 'Transition', 'DKT']:
             graph = graph.cuda()
 
-    return concept_num, graph, train_data_loader, valid_data_loader, test_data_loader, test_last_q_idx
+    return concept_num, graph, train_data_loader, valid_data_loader, test_data_loader, test_last_q_idx, valid_last_q_idx
 
 
 
