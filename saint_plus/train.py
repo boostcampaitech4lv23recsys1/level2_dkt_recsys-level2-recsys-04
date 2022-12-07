@@ -177,6 +177,7 @@ class PlusSAINTModule(pl.LightningModule):
         auc = roc_auc_score(labels, out)
         self.print("train auc", auc)
         self.log("train_auc", auc)
+        
 
     def validation_step(self, batch, batch_ids):
         input, input_labels, labels = batch
@@ -218,6 +219,7 @@ class PlusSAINTModule(pl.LightningModule):
         return {"test_loss": loss, "outs": out, "labels": labels}
         
     def test_epoch_end(self, test_output):
+        print("augmentation : ", Config.AUG)
         out = np.concatenate([i["outs"].cpu().detach().numpy()
                               for i in test_output]).reshape(-1)
         print('-------save-file-------')

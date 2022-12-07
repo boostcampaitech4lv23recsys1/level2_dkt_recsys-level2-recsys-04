@@ -3,10 +3,10 @@ import torch
 
 class Config:
     device = torch.device("cuda" if torch.cuda.is_available() else 'cpu')
-    MAX_SEQ = 100  # USER 별 최대 문제 풀이 개수
+    MAX_SEQ = 20  # USER 별 최대 문제 풀이 개수
     MIN_SEQ = 10   # USER 별 최소 문제 풀이 개수 (대회 Test 데이터 최소 문제 풀이 유저 -> 15개)
     BATCH_SIZE = 32
-    TRAIN_FILE = "/opt/ml/input/data/train_saint_dkt_x5.csv"
+    TRAIN_FILE = "/opt/ml/input/data/train_saint_dkt"
     TEST_FILE = "/opt/ml/input/data/test_saint_dkt.csv"
     SUBMISSION_FILE = "/opt/ml/input/data/sample_submission.csv"
     TOTAL_EXE = 9454 + 1  # 대회 dataset 서로 다른 assessmentItemID 개수, +1은 mask 0 때문에 해줌

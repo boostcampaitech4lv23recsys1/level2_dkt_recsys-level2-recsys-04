@@ -75,7 +75,8 @@ def get_dataloaders():
     print("loading csv.....")
     ### HSEUNEH_SAINT.ipynb 돌리면 "전처리" + "증강" csv 생성 ###
 
-    train_df = pd.read_csv(Config.TRAIN_FILE)
+    train_file = Config.TRAIN_FILE+f'_x{Config.AUG}.csv'
+    train_df = pd.read_csv(train_file)
     test_df = pd.read_csv(Config.TEST_FILE)
 
     # grouping based on userID to get the data supplu
@@ -85,32 +86,20 @@ def get_dataloaders():
         .apply(lambda r: (r.assessmentItemID.values, r.answerCode.values,
                           r.prior_question_elapsed_time.values, r.KnowledgeTag.values))
 
-
-    test_to_train_df = test_df.loc[test_df['answerCode'] != -1]  # Test 데이터 user 별 마지막 문제 제외한 데이터
-    test_to_train_group = test_to_train_df[["userID", "assessmentItemID", "answerCode", "prior_question_elapsed_time", "KnowledgeTag"]]\
-        .groupby("userID")\
-        .apply(lambda r: (r.assessmentItemID.values, r.answerCode.values,
-                            r.prior_question_elapsed_time.values, r.KnowledgeTag.values))
-
-    # test_df.loc[test_df['answerCode'] == -1, 'answerCode'] = 2  # -1 그대로 두면 embedding 단계에서 error 발생
     test_group = test_df[["userID", "assessmentItemID", "answerCode", "prior_question_elapsed_time", "KnowledgeTag"]]\
         .groupby("userID")\
         .apply(lambda r: (r.assessmentItemID.values, r.answerCode.values,
                           r.prior_question_elapsed_time.values, r.KnowledgeTag.values))
     
-    # breakpoint()
 
 
     print("splitting")
     # Test 데이터의 user가 Valid로 들어가면, Test user가 학습되지 않기 때문에, 최초의 Train 데이터에서 Split 진행
     train, val = train_test_split(train_group, test_size=Config.VALID_SIZE, shuffle=True)
-    train = pd.concat([train, test_to_train_group])  # Test에서 -1 제외한 user 별 데이터 Train으로 concat
     test = test_group.copy()
 
-    # breakpoint()
-
     # 메모리 청소하는 부분인듯? GKT 모델에도 써보면 좋을듯 -> 이미 있음
-    del train_df, test_df, test_to_train_df, train_group, test_group, test_to_train_group
+    del train_df, test_df, train_group, test_group
     gc.collect()
  
 
