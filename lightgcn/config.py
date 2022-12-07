@@ -27,7 +27,7 @@ class CFG:
     weight = "./weight/best_model.pt"
 
     # train
-    n_epoch = 30 # 139
+    n_epoch = 139 # 30
     learning_rate = 0.01 # 0.05
     # lr_decay, gamma는 추가한 것, 스케줄러.
     lr_decay = 5 

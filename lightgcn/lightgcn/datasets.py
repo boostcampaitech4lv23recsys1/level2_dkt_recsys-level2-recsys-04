@@ -82,6 +82,7 @@ def indexing_data(data):
     itemid_2_index = {v: i + n_user for i, v in enumerate(itemid)}
     id_2_index = dict(userid_2_index, **itemid_2_index)
 
+
     return id_2_index
 
 
@@ -93,10 +94,13 @@ def process_data(data, id_2_index, device, train = True):
         edge.append([uid, iid])
         label.append(acode)
 
-    edge = torch.LongTensor(edge).T
-    label = torch.LongTensor(label)
-
+    edge = torch.LongTensor(edge).T  # torch.Size([2, 2468520])
+    label = torch.LongTensor(label)  # torch.Size([2468520])
     if train:
+        '''
+        {'edge': tensor([[    0,     0,     0,  ...,  7439,  7439,  7439],
+            [12796, 12797, 12798,  ..., 11170, 11171, 11172]], device='cuda:0'), 'label': tensor([1, 1, 1,  ..., 0, 1, 1], device='cuda:0')}
+        '''
         return dict(edge=edge.to(device), label=label.to(device))
     else:
         return dict(edge=edge.to(device), label=label)
