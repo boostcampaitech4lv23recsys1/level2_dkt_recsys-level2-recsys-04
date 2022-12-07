@@ -49,6 +49,8 @@ def main():
         valid_data = valid_data, # 베이스라인 대비 추가
         n_epoch=CFG.n_epoch,
         learning_rate=CFG.learning_rate,
+        lr_decay = CFG.lr_decay,
+        gamma = CFG.gamma,
         use_wandb=CFG.user_wandb,
         weight=CFG.weight_basepath,
         logger=logger.getChild("train"),
