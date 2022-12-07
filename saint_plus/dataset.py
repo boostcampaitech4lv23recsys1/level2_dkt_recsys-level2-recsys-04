@@ -148,20 +148,24 @@ def get_dataloaders():
     gc.collect()
 
 
-    # print("shape of train :", train_df.shape)
-    # print("shape of val :", test_df.shape)
+    print("shape of train :", train_df.shape)
+    print("shape of val :", test_df.shape)
 
-    # train_df = train_df[train_df.content_type_id == 0]
-    # train_df.prior_question_elapsed_time.fillna(0, inplace=True)
-    # train_df.prior_question_elapsed_time /= 1000
-    # train_df.prior_question_elapsed_time.clip(lower=0,upper=300,inplace=True)
-    # train_df.prior_question_elapsed_time = train_df.prior_question_elapsed_time.astype(np.int)
+    train_df = train_df[train_df.content_type_id == 0]
+    train_df.prior_question_elapsed_time.fillna(0, inplace=True)
+    train_df.prior_question_elapsed_time /= 1000
+    train_df.prior_question_elapsed_time.clip(lower=0,upper=300,inplace=True)
+    train_df.prior_question_elapsed_time = train_df.prior_question_elapsed_time.astype(np.int)
     
-    # train_df = train_df.sort_values(["timestamp"], ascending=True).reset_index(drop=True)
-    # n_skills = train_df.assessmentItemID.nunique()
-    # print("no. of skills :", n_skills)
-    # print("shape after exlusion:", train_df.shape)
-
+    train_df = train_df.sort_values(["timestamp"], ascending=True).reset_index(drop=True)
+    n_skills = train_df.assessmentItemID.nunique()
+    print("no. of skills :", n_skills)
+    print("shape after exlusion:", train_df.shape)
+    train = pd.read_csv(Config.TRAIN_FILE, index_col = "userID").squeeze()
+    # train = train.loc[train.index].apply(tuple)
+    val = pd.read_csv(Config.VALID_FILE, index_col = "userID").squeeze()
+    test = pd.read_csv(Config.TEST_FILE, index_col = "userID").squeeze()
+    breakpoint()
     train_dataset = DKTDataset(train, max_seq=Config.MAX_SEQ)
     val_dataset = DKTDataset(val, max_seq=Config.MAX_SEQ)
     test_dataset = DKTDataset(test, max_seq=Config.MAX_SEQ)

@@ -12,6 +12,8 @@ import torch
 import torch.nn.functional as F
 
 
+
+
 class FFN(nn.Module):
     def __init__(self, in_feat):
         super(FFN, self).__init__()

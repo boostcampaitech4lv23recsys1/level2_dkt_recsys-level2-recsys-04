@@ -5,6 +5,10 @@ from sklearn import preprocessing
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import accuracy_score
 import os
+import optuna
+from optuna import Trial, visualization
+from optuna.samplers import TPESampler
+
 class Cat_boost():
     def __init__(self, args):
         self.args = args
@@ -92,11 +96,11 @@ class Cat_boost():
 
         self.train_value = train['answerCode']
         self.train = train
-        self.train.drop(['answerCode'],axis=1)
+        # self.train.drop(['answerCode'],axis=1)
 
         self.valid_value = valid['answerCode']
         self.valid = valid
-        self.valid.drop(['answerCode'],axis=1)
+        # self.valid.drop(['answerCode'],axis=1)
 
         self.test = test
 
@@ -125,6 +129,8 @@ class Cat_boost():
         self.valid = self.feature_engineering(self.valid,FEATURE)
         self.train = self.feature_engineering(self.train,FEATURE)
         self.test = self.feature_engineering(self.test,FEATURE)
+        
+        return self.train, self.valid, self.test
 
     
     

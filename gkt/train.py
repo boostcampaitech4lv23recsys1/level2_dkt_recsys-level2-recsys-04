@@ -399,8 +399,7 @@ def test():
     else:
         model.load_state_dict(torch.load(model_file))
     with torch.no_grad():
-        for batch_idx, (features, questions, answers) in enumerate(test_loader):
-            
+        for batch_idx, (features, questions, answers) in enumerate(test_loader):            
             if args.cuda:
                 features, questions, answers = features.cuda(), questions.cuda(), answers.cuda()
             ec_list, rec_list, z_prob_list = None, None, None
