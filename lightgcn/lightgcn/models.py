@@ -36,6 +36,8 @@ def train(
     valid_data=None,
     n_epoch=100,
     learning_rate=0.01,
+    batch_size = 2048,
+    weight_decay = 1e-5,
     lr_decay = 10,
     gamma = 0.9,
     use_wandb=False,
@@ -44,7 +46,7 @@ def train(
 ):
     model.train()
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     scheduler = lr_scheduler.StepLR(optimizer, step_size=lr_decay, gamma=gamma)
     if not os.path.exists(weight):
         os.makedirs(weight)
@@ -62,17 +64,29 @@ def train(
 
     logger.info(f"Training Started : n_epoch={n_epoch}")
     best_auc, best_epoch = 0, -1
+
     for e in range(n_epoch):
         # forward
-        pred = model(train_data["edge"])
+        idx = np.arange(len(train_data["edge"][0]))
+        idx = np.random.permutation(idx)
+        edge = train_data["edge"][:,idx]
+        label = train_data["label"][idx]
 
         # https://pytorch-geometric.readthedocs.io/en/latest/_modules/torch_geometric/nn/models/lightgcn.html
-        loss = model.link_pred_loss(pred, train_data["label"])
 
-        # backward
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+        for i in range(len(edge[0]) // batch_size):
+            tem = min(batch_size * (i+1), len(edge[0]))
+            b_edge = edge[:,batch_size*i:tem]
+            b_label = label[batch_size*i:tem]
+
+            pred = model(b_edge)
+            loss = model.link_pred_loss(pred, b_label)
+            # backward
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            
+        #breakpoint()
         with torch.no_grad():
             prob = model.predict_link(valid_data["edge"], prob=True)
             prob = prob.detach().cpu().numpy()

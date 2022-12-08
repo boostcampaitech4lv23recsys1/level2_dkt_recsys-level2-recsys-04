@@ -62,12 +62,14 @@ def separate_data(data):
 # train을 train과 valid로 나눔. 단점 : 시간이 1분정도 걸림.
 def separate_valid(train_data):
     # 유저 기준 가장 마지막에 본 문제 valid 취급.
-    user_final_time = train_data.groupby(['userID']).last()['assessmentItemID']
-    train_data['train_valid'] = train_data.apply(lambda x : -1 if x.assessmentItemID == user_final_time[x.userID] else x['answerCode'], axis = 1)
+    train_data['train_valid'] = 0
+    train_data.reset_index(drop= True, inplace = True)
+    train_data.loc[train_data.drop_duplicates(subset='userID', keep = 'last').index, 'train_valid'] = -1
     valid_data = train_data[train_data['train_valid'] == -1]
-    train_data = train_data[train_data['train_valid'] >= 0] 
+    train_data = train_data[train_data['train_valid'] == 0] 
     train_data.drop(['train_valid'], axis = 1, inplace = True)
     valid_data.drop(['train_valid'], axis = 1, inplace = True)
+    
     return train_data, valid_data
 
 
