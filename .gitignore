@@ -19,3 +19,7 @@ logs
 /gkt/processing_ysh.py
 /gkt/data copy
 /gkt/__pycache__
+
+# saint_plus 내부 log
+/saint_plus/lightning_logs
+/saint_plus/submission
