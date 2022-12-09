@@ -15,18 +15,18 @@ class CFG:
     pred_file = "submission_1128.csv"
 
     # build
-    embedding_dim = 128  # int, 64
+    embedding_dim = 512  # int, 64
     num_layers = 3  # int, 1
     alpha = None  # Optional[Union[float, Tensor]]
     build_kwargs = {}  # other arguments
     weight = "./weight/best_model.pt"
 
     # train
-    n_epoch = 139 # 30
-    learning_rate = 0.01 # 0.05
+    n_epoch = 150 # 30
+    learning_rate = 0.005371  # 0.05
     # lr_decay, gamma는 추가한 것, 스케줄러.
     lr_decay = 5 
-    gamma = 0.9
+    gamma = 0.4
     weight_basepath = "./weight" 
 
 
