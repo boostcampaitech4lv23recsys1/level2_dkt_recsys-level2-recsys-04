@@ -97,7 +97,6 @@ def train(
             )
             if use_wandb:
                 import wandb
-
                 wandb.log(dict(loss=loss, acc=acc, auc=auc))
 
         if weight:

@@ -96,11 +96,11 @@ class Xg_boost():
 
         self.train_value = train['answerCode']
         self.train = train
-        self.train.drop(['answerCode'],axis=1)
+        # self.train.drop(['answerCode'],axis=1)
 
         self.valid_value = valid['answerCode']
         self.valid = valid
-        self.valid.drop(['answerCode'],axis=1)
+        # self.valid.drop(['answerCode'],axis=1)
 
         self.test = test
 
@@ -125,6 +125,8 @@ class Xg_boost():
 
         print("TRAIN VALID SPLIT")
         self.make_train_valid_feature(data)
+        
+        return self.train, self.valid, self.test
 
     
     

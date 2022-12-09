@@ -1,14 +1,11 @@
 import pandas as pd
 import torch
+import config
 from config import CFG, logging_conf
 from lightgcn.datasets import prepare_dataset
 from lightgcn.models import build, train
 from lightgcn.utils import class2dict, get_logger
-
-if CFG.user_wandb:
-    import wandb
-
-    wandb.init(**CFG.wandb_kwargs, config=class2dict(CFG))
+import wandb
 
 
 logger = get_logger(logging_conf)
@@ -18,6 +15,8 @@ print(device)
 
 
 def main():
+    wandb.init(config=class2dict(CFG))
+
     logger.info("Task Started")
 
     logger.info("[1/1] Data Preparing - Start")
@@ -29,9 +28,9 @@ def main():
     logger.info("[2/2] Model Building - Start")
     model = build(
         n_node,
-        embedding_dim=CFG.embedding_dim,
-        num_layers=CFG.num_layers,
-        alpha=CFG.alpha,
+        embedding_dim=wandb.config.embedding_dim,
+        num_layers=wandb.config.num_layers,
+        alpha=wandb.config.alpha,
         logger=logger.getChild("build"),
         **CFG.build_kwargs
     )
@@ -47,12 +46,10 @@ def main():
         model,
         train_data,
         valid_data = valid_data, # 베이스라인 대비 추가
-        n_epoch=CFG.n_epoch,
-        learning_rate=CFG.learning_rate,
-        batch_size = CFG.batch_size,
-        weight_decay = CFG.weight_decay,
-        lr_decay = CFG.lr_decay,
-        gamma = CFG.gamma,
+        n_epoch=wandb.config.n_epoch,
+        learning_rate=wandb.config.learning_rate,
+        lr_decay = wandb.config.lr_decay,
+        gamma = wandb.config.gamma,
         use_wandb=CFG.user_wandb,
         weight=CFG.weight_basepath,
         logger=logger.getChild("train"),
@@ -63,4 +60,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if CFG.user_wandb:
+        wandb.login()
+        sweep_id = wandb.sweep(sweep=config.sweep_configuration)
+        wandb.agent(sweep_id=sweep_id, function=main)
+    else:
+        main()

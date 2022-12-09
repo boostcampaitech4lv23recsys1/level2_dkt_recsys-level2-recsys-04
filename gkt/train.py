@@ -52,7 +52,7 @@ parser.add_argument('--dropout', type=float, default=0, help='Dropout rate (1 - 
 parser.add_argument('--bias', type=bool, default=True, help='Whether to add bias for neural network layers.')
 parser.add_argument('--binary', type=bool, default=True, help='Whether only use 0/1 for results.')
 parser.add_argument('--var', type=float, default=1, help='Output variance.')
-parser.add_argument('--epochs', type=int, default=5, help='Number of epochs to train.')
+parser.add_argument('--epochs', type=int, default=1, help='Number of epochs to train.')
 parser.add_argument('--batch-size', type=int, default=64, help='Number of samples per batch.')
 parser.add_argument('--lr', type=float, default=0.01, help='Initial learning rate.')
 parser.add_argument('--lr-decay', type=int, default=200, help='After how epochs to decay LR by a factor of gamma.')
@@ -74,6 +74,9 @@ parser.add_argument('--test-model-dir', type=str, default='logs/expGKT', help='E
 parser.add_argument('--max-seq-len-limit', type=int, default=600, help='max-seq-len ')
 parser.add_argument('--test-valid-len', type=int, default=3, help='max-seq-len ')
 
+# wandb
+parser.add_argument('--use-wandb', type=bool, default=True, help='Whether use wandb or not')
+
 
 
 args = parser.parse_args()
@@ -91,6 +94,14 @@ if args.cuda:
     torch.backends.cudnn.deterministic = True
 
 res_len = 2 if args.binary else args.result_type
+
+
+# wandb
+if args.use_wandb:
+    import wandb
+    wandb.init()
+    wandb.config.update(args)
+
 
 # Save model and meta-data. Always saves in a new sub-folder.
 # 파일이름 설정부분
@@ -168,12 +179,12 @@ if args.load_dir:
     else:
         raise NotImplementedError(args.model + ' model is not implemented!')
     model_file = os.path.join(args.load_dir, model_file_name + '.pt')
-    optimizer_file = os.path.join(save_dir, model_file_name + '-Optimizer.pt')
-    scheduler_file = os.path.join(save_dir, model_file_name + '-Scheduler.pt')
+    optimizer_file = os.path.join(args.load_dir, model_file_name + '-Optimizer.pt')
+    scheduler_file = os.path.join(args.load_dir, model_file_name + '-Scheduler.pt')
     model.load_state_dict(torch.load(model_file))
     optimizer.load_state_dict(torch.load(optimizer_file))
     scheduler.load_state_dict(torch.load(scheduler_file))
-    args.save_dir = False
+    # args.save_dir = False
 
 # build optimizer
 optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -193,6 +204,8 @@ if args.model == 'GKT' and args.prior:
 if args.cuda:
     model = model.cuda()
     kt_loss = KTLoss()
+
+wandb.watch(model)
 
 
 def train(epoch, best_val_loss):
@@ -275,7 +288,7 @@ def train(epoch, best_val_loss):
             pred_valid = [u_pred_list[last_idx].item() for u_pred_list, last_idx in zip(pred_res, valid_last_q_idx[batch_idx*64:(batch_idx+1)*64])]
             real_valid = [u_pred_list[last_idx+1].item() for u_pred_list, last_idx in zip(answers, valid_last_q_idx[batch_idx*64:(batch_idx+1)*64])]
             
-            loss_kt, auc, acc = kt_loss(pred_res, answers)      
+            loss_kt, auc, acc = kt_loss(pred_res, answers)
 
             pred_valids += pred_valid
             real_valids += real_valid
@@ -296,9 +309,10 @@ def train(epoch, best_val_loss):
             del loss
         print('True val auc score !!!!!')
         #breakpoint()
-        print(roc_auc_score(real_valids, pred_valids))
+        real_auc_val = roc_auc_score(real_valids, pred_valids)
+        print(real_auc_val)
         print('')
-
+        wandb.log(dict(auc=real_auc_val))
     
 
     if args.model == 'GKT' and args.graph_type == 'VAE':
@@ -325,6 +339,9 @@ def train(epoch, best_val_loss):
               'time: {:.4f}s'.format(time.time() - t))
     if args.save_dir and np.mean(loss_val) < best_val_loss:
         print('Best model so far, saving...')
+        model_file = os.path.join(save_dir, model_file_name + '.pt')
+        optimizer_file = os.path.join(save_dir, model_file_name + '-Optimizer.pt')
+        scheduler_file = os.path.join(save_dir, model_file_name + '-Scheduler.pt')
         torch.save(model.state_dict(), model_file)
         torch.save(optimizer.state_dict(), optimizer_file)
         torch.save(scheduler.state_dict(), scheduler_file)
@@ -382,8 +399,7 @@ def test():
     else:
         model.load_state_dict(torch.load(model_file))
     with torch.no_grad():
-        for batch_idx, (features, questions, answers) in enumerate(test_loader):
-            
+        for batch_idx, (features, questions, answers) in enumerate(test_loader):            
             if args.cuda:
                 features, questions, answers = features.cuda(), questions.cuda(), answers.cuda()
             ec_list, rec_list, z_prob_list = None, None, None
@@ -396,14 +412,13 @@ def test():
             
             # submission 파일 생성
             submission = [u_pred_list[last_idx].item() for u_pred_list, last_idx in zip(pred_res, test_last_q_idx)]
-            if args.load_dir:
-                pd.DataFrame({"prediction": submission}).to_csv(
-                    os.path.join(args.load_dir, 'submission.csv'), index_label="id"
-                )
-            else:
-                pd.DataFrame({"prediction": submission}).to_csv(
-                    os.path.join(save_dir, 'submission.csv'), index_label="id"
-                )
+            # if args.load_dir:
+            #     pd.DataFrame({"prediction": submission}).to_csv(
+            #         os.path.join(args.load_dir, 'submission.csv'), index_label="id"
+            #     )
+            pd.DataFrame({"prediction": submission}).to_csv(
+                os.path.join(save_dir, 'submission.csv'), index_label="id"
+            )
 
             loss_kt, auc, acc = kt_loss(pred_res, answers)
             loss_kt = float(loss_kt.cpu().detach().numpy())
@@ -477,3 +492,5 @@ test()
 if log is not None:
     print(save_dir)
     log.close()
+
+wandb.finish()
