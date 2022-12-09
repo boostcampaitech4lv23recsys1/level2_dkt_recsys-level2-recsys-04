@@ -99,7 +99,7 @@ def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_t
     # dtype = {
     #     'userID': 'int16',
     #     'answerCode': 'int8',
-    #     'KnowledgeTag': 'int16'
+    #     tag_id: 'int16'
     # }
     DATA_PATH = '/opt/ml/input/data/GKT/' # '/opt/ml/input/data/'
 
@@ -107,11 +107,16 @@ def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_t
     valid = pd.read_csv(DATA_PATH + 'valid_data2.csv')#, dtype=dtype, parse_dates=['Timestamp'])
     test = pd.read_csv(DATA_PATH + 'test_data2.csv')#, dtype=dtype, parse_dates=['Timestamp'])
 
-    tag = pd.concat([train, valid, test], axis = 0)['KnowledgeTag'].unique()
+    tag_id = 'assessmentItemID'
+    train[tag_id] = train[tag_id].str.slice(start=2, stop=7)
+    valid[tag_id] = valid[tag_id].str.slice(start=2, stop=7)
+    test[tag_id] = test[tag_id].str.slice(start=2, stop=7)
+    
+    tag = pd.concat([train, valid, test], axis = 0)[tag_id].unique()
     tag2idx = {tag:idx for idx, tag in enumerate(tag)}
-    train['KTag'] = train['KnowledgeTag'].map(tag2idx)
-    valid['KTag'] = valid['KnowledgeTag'].map(tag2idx)
-    test['KTag'] = test['KnowledgeTag'].map(tag2idx)
+    train['Tag'] = train[tag_id].map(tag2idx)
+    valid['Tag'] = valid[tag_id].map(tag2idx)
+    test['Tag'] = test[tag_id].map(tag2idx)
     
 
     # test 데이터의 각 유저 별 마지막 문제 맞았다고 가정 -> 나중에 예측에서 진짜 맞았을 확률 토해냄 -> 이게 우리 리더보드 채점 방식에 맞는 것 같음
@@ -120,14 +125,15 @@ def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_t
 
     # Step 3 - Cross skill id with answer to form a synthetic feature
     # use_binary: (0,1); !use_binary: (1,2,3,4,5,6,7,8,9,10,11,12). Either way, the answerCode result index is guaranteed to be 1
+    
     if use_binary:
-        train['KTag_wiht_answer'] = train['KTag'] * 2 + train['answerCode']
-        valid['KTag_wiht_answer'] = valid['KTag'] * 2 + valid['answerCode']
-        test['KTag_wiht_answer'] = test['KTag'] * 2 + test['answerCode']
+        train['Tag_wiht_answer'] = train['Tag'] * 2 + train['answerCode']
+        valid['Tag_wiht_answer'] = valid['Tag'] * 2 + valid['answerCode']
+        test['Tag_wiht_answer'] = test['Tag'] * 2 + test['answerCode']
     else:
-        train['KTag_wiht_answer'] = train['KTag'] * res_len + train['answerCode'] - 1
-        valid['KTag_wiht_answer'] = valid['KTag'] * res_len + valid['answerCode'] - 1
-        test['KTag_wiht_answer'] = test['KTag'] * res_len + test['answerCode'] - 1
+        train['Tag_wiht_answer'] = train['Tag'] * res_len + train['answerCode'] - 1
+        valid['Tag_wiht_answer'] = valid['Tag'] * res_len + valid['answerCode'] - 1
+        test['Tag_wiht_answer'] = test['Tag'] * res_len + test['answerCode'] - 1
 
     # Step 4 - Convert to a sequence per user id and shift features 1 timestep
     # 2차원 리스트로 만들기. 칼럼별 (유저수 * 시퀀셜 수)
@@ -138,8 +144,8 @@ def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_t
     train_seq_len_list = []
 
     def train_get_data(series):
-        train_feature_list.append(series['KTag_wiht_answer'].tolist())
-        train_question_list.append(series['KTag'].tolist())
+        train_feature_list.append(series['Tag_wiht_answer'].tolist())
+        train_question_list.append(series['Tag'].tolist())
         train_answer_list.append(series['answerCode'].eq(1).astype('int').tolist())
         train_seq_len_list.append(series['answerCode'].shape[0])
     
@@ -149,8 +155,8 @@ def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_t
     valid_seq_len_list = []
     
     def valid_get_data(series):
-        valid_feature_list.append(series['KTag_wiht_answer'].tolist())
-        valid_question_list.append(series['KTag'].tolist())
+        valid_feature_list.append(series['Tag_wiht_answer'].tolist())
+        valid_question_list.append(series['Tag'].tolist())
         valid_answer_list.append(series['answerCode'].eq(1).astype('int').tolist())
         valid_seq_len_list.append(series['answerCode'].shape[0])
 
@@ -160,8 +166,8 @@ def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_t
     test_seq_len_list = []
     
     def test_get_data(series):
-        test_feature_list.append(series['KTag_wiht_answer'].tolist())
-        test_question_list.append(series['KTag'].tolist())
+        test_feature_list.append(series['Tag_wiht_answer'].tolist())
+        test_question_list.append(series['Tag'].tolist())
         test_answer_list.append(series['answerCode'].eq(1).astype('int').tolist())
         test_seq_len_list.append(series['answerCode'].shape[0])
         
@@ -173,7 +179,7 @@ def load_dataset(file_path,max_seq_len_limit,test_valid_len, batch_size, graph_t
     seq_len_list = train_seq_len_list + valid_seq_len_list + test_seq_len_list
 
     student_num = len(seq_len_list)
-    question_dim = int(train['KTag'].max() + 1)
+    question_dim = int(train['Tag'].max() + 1)
     concept_num = question_dim
 
     # print('feature_dim:', feature_dim, 'res_len*question_dim:', res_len*question_dim)

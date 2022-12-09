@@ -52,7 +52,7 @@ parser.add_argument('--dropout', type=float, default=0, help='Dropout rate (1 - 
 parser.add_argument('--bias', type=bool, default=True, help='Whether to add bias for neural network layers.')
 parser.add_argument('--binary', type=bool, default=True, help='Whether only use 0/1 for results.')
 parser.add_argument('--var', type=float, default=1, help='Output variance.')
-parser.add_argument('--epochs', type=int, default=5, help='Number of epochs to train.')
+parser.add_argument('--epochs', type=int, default=1, help='Number of epochs to train.')
 parser.add_argument('--batch-size', type=int, default=64, help='Number of samples per batch.')
 parser.add_argument('--lr', type=float, default=0.01, help='Initial learning rate.')
 parser.add_argument('--lr-decay', type=int, default=200, help='After how epochs to decay LR by a factor of gamma.')
@@ -74,6 +74,9 @@ parser.add_argument('--test-model-dir', type=str, default='logs/expGKT', help='E
 parser.add_argument('--max-seq-len-limit', type=int, default=600, help='max-seq-len ')
 parser.add_argument('--test-valid-len', type=int, default=3, help='max-seq-len ')
 
+# wandb
+parser.add_argument('--use-wandb', type=bool, default=True, help='Whether use wandb or not')
+
 
 
 args = parser.parse_args()
@@ -91,6 +94,14 @@ if args.cuda:
     torch.backends.cudnn.deterministic = True
 
 res_len = 2 if args.binary else args.result_type
+
+
+# wandb
+if args.use_wandb:
+    import wandb
+    wandb.init()
+    wandb.config.update(args)
+
 
 # Save model and meta-data. Always saves in a new sub-folder.
 # 파일이름 설정부분
@@ -194,6 +205,8 @@ if args.cuda:
     model = model.cuda()
     kt_loss = KTLoss()
 
+wandb.watch(model)
+
 
 def train(epoch, best_val_loss):
     t = time.time()
@@ -275,7 +288,7 @@ def train(epoch, best_val_loss):
             pred_valid = [u_pred_list[last_idx].item() for u_pred_list, last_idx in zip(pred_res, valid_last_q_idx[batch_idx*64:(batch_idx+1)*64])]
             real_valid = [u_pred_list[last_idx+1].item() for u_pred_list, last_idx in zip(answers, valid_last_q_idx[batch_idx*64:(batch_idx+1)*64])]
             
-            loss_kt, auc, acc = kt_loss(pred_res, answers)      
+            loss_kt, auc, acc = kt_loss(pred_res, answers)
 
             pred_valids += pred_valid
             real_valids += real_valid
@@ -296,9 +309,10 @@ def train(epoch, best_val_loss):
             del loss
         print('True val auc score !!!!!')
         #breakpoint()
-        print(roc_auc_score(real_valids, pred_valids))
+        real_auc_val = roc_auc_score(real_valids, pred_valids)
+        print(real_auc_val)
         print('')
-
+        wandb.log(dict(auc=real_auc_val))
     
 
     if args.model == 'GKT' and args.graph_type == 'VAE':
@@ -478,3 +492,5 @@ test()
 if log is not None:
     print(save_dir)
     log.close()
+
+wandb.finish()
